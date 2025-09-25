@@ -14,13 +14,11 @@ enum class processing_style {
 template<typename Range, typename... Stages>
 [[nodiscard]] constexpr auto apply(Range &&range, Stages &&... stages);
 
-
 template<typename Child>
 struct stage_impl;
 
 template<template<typename...> typename Derived, typename StageProperties, typename... Parameters>
 struct stage_impl<Derived<StageProperties, Parameters...>>;
-
 
 template<typename Stage>
 concept incremental_input = Stage::input_processing_style
@@ -70,7 +68,6 @@ template<typename Input, processing_style PreviousOutputProcessingStyle, process
 using adapt_input_t = typename adapt_input<Input,
                                            PreviousOutputProcessingStyle,
                                            InputProcessingStyle>::type;
-
 
 template<template<typename...> typename Derived, typename StageProperties, typename... Parameters>
 struct stage_impl<Derived<StageProperties, Parameters...>> {
@@ -126,8 +123,8 @@ struct stage_impl<Derived<StageProperties, Parameters...>> {
           child_type>) {
     for (auto &&v : static_cast<raw_input_type>(input)) {
       static_assert(std::is_same_v<decltype(v), input_type>);
-      auto& child = static_cast<child_type &>(*this);
-      if(child.done()) break;
+      auto &child = static_cast<child_type &>(*this);
+      if (child.done()) break;
       child.process_incremental(
           std::forward<decltype(v)>(v));
     }
@@ -158,8 +155,8 @@ using instantiable_t = typename instantiable<T>::type;
 
 template<template<typename, typename...> typename StageImpl, processing_style InputProcessingStyle,
     processing_style OutputProcessingStyle,
-    typename Parameters = void, typename... TypeParameters>
-class stage {
+    typename Parameters = std::tuple<>, typename... TypeParameters>
+class stage_instantiator {
   [[no_unique_address]] instantiable_t<Parameters> parameters_;
 
  public:
@@ -174,21 +171,30 @@ class stage {
                                          TypeParameters...>::output_type;
 
   template<typename... Ts>
-  constexpr explicit stage(Ts &&... ts)
+  constexpr explicit stage_instantiator(Ts &&... ts)
       :parameters_{std::forward<Ts>(ts)...} {}
 
   template<typename StageProperties, typename Next>
   constexpr auto make(Next &&next) {
-    if constexpr (std::is_same_v<Parameters, void>) {
-      return StageImpl<StageProperties, TypeParameters...>{
-          std::forward<Next>(next)};
-    } else {
+    return std::apply([&](auto &&... ts) {
       return StageImpl<StageProperties, TypeParameters...>{
           std::forward<Next>(next),
-          std::move(parameters_)};
-    }
+          std::forward<decltype(ts)>(ts)...};
+    }, std::move(parameters_));
   }
 };
+
+template<template<typename, typename...> typename StageImpl, processing_style InputProcessingStyle,
+    processing_style OutputProcessingStyle,
+    typename... TypeParameters, typename... Ts>
+constexpr auto stage(Ts &&... ts) {
+  return stage_instantiator<StageImpl,
+                            InputProcessingStyle,
+                            OutputProcessingStyle,
+                            std::tuple<std::remove_cvref_t<Ts>...>,
+                            TypeParameters...>(std::forward<
+      decltype(ts)>(ts)...);
+}
 
 template<typename F>
 struct composed {
@@ -226,7 +232,7 @@ struct end_stage {
     return std::forward<T>(t);
   }
 
-  constexpr bool done() const {return false;}
+  constexpr bool done() const { return false; }
 
   constexpr void process_complete(std::monostate) {}
 };
@@ -396,8 +402,7 @@ constexpr auto for_each(F f) {
   return stage<for_each_impl,
                processing_style::incremental,
                processing_style::complete,
-               F,
-               F>{std::move(f)};
+               F>(std::move(f));
 }
 
 template<template<typename...> typename T>
@@ -427,21 +432,8 @@ struct accumulate_in_place_impl
   using accumulated_type = std::remove_cvref_t<apply_input_to_typename_t<T,
                                                                          input_type>>;
   using output_type = accumulated_type &&;
-  [[no_unique_address]] accumulated_type accumulated{};
   [[no_unique_address]] F f{};
-
-  constexpr accumulate_in_place_impl(auto &&stage_properties,
-                                     std::tuple<accumulated_type, F> &&tuple)
-      : base(
-      std::forward<decltype(stage_properties)>(stage_properties)),
-        accumulated(std::get<0>(tuple)),
-        f(std::get<1>(tuple)) {}
-
-  constexpr accumulate_in_place_impl(auto &&stage_properties, F &&f)
-      : base(
-      std::forward<decltype(stage_properties)>(stage_properties)),
-        accumulated{},
-        f(std::move(f)) {}
+  [[no_unique_address]] accumulated_type accumulated{};
 
   constexpr decltype(auto) process_incremental(input_type input) {
     std::invoke(f, accumulated, this->forward(input));
@@ -458,10 +450,9 @@ constexpr auto accumulate_in_place(T t, F f) {
   return stage<accumulate_in_place_impl,
                processing_style::incremental,
                processing_style::complete,
-               std::tuple<T, F>,
                T,
-               F>(std::make_tuple(std::move(t),
-                                  std::move(f)));
+               F>(
+      std::move(f), std::move(t));
 }
 
 template<template<typename...> typename T, typename F>
@@ -469,7 +460,6 @@ constexpr auto accumulate_in_place(F f) {
   return stage<accumulate_in_place_impl,
                processing_style::incremental,
                processing_style::complete,
-               F,
                template_to_typename<T>,
                F>(std::move(f));
 }
@@ -507,60 +497,61 @@ struct flat_map_impl
   using typename base::input_type;
   using output_type = typename OutputTypeCalculator::template type<input_type> &&;
   [[no_unique_address]] F f{};
-  bool done_ =  false;
+  bool done_ = false;
 
   constexpr decltype(auto) process_incremental(input_type input) {
-    auto out =  [this](auto&& output){
+    auto out = [this](auto &&output) {
       this->next.process_incremental(std::forward<decltype(output)>(output));
     };
-    done_ = !std::invoke(f,out,  this->forward(input));
+    done_ = !std::invoke(f, out, this->forward(input));
   }
 
-  constexpr bool done() const{
+  constexpr bool done() const {
     return done_;
   }
 
 };
 
-struct IdentityOutputCalculator{
+struct IdentityOutputCalculator {
   template<typename T>
   using type = T;
 };
 
 template<typename OutputCalculator = IdentityOutputCalculator, typename F>
-constexpr auto flat_map(F f){
-  return stage<flat_map_impl,processing_style ::incremental, processing_style ::incremental,
-  F, F, OutputCalculator>(std::move(f));
+constexpr auto flat_map(F f) {
+  return stage<flat_map_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               F,
+               OutputCalculator>(std::move(f));
 
 }
 
-
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
-  return flat_map([predicate = std::move(predicate)](auto& output,
-      auto&& input){
-    if(std::invoke(predicate,std::as_const(input))){
-     output(std::forward<decltype(input)>(input));
+  return flat_map([predicate = std::move(predicate)](auto &output,
+                                                     auto &&input) {
+    if (std::invoke(predicate, std::as_const(input))) {
+      output(std::forward<decltype(input)>(input));
     }
     return true;
   });
 }
 
 template<typename F>
-struct TransformOutputCalculator{
-    template<typename Input>
-    using type = std::invoke_result_t<F,Input>;
+struct TransformOutputCalculator {
+  template<typename Input>
+  using type = std::invoke_result_t<F, Input>;
 };
 
 template<typename F>
-constexpr auto transform(F f){
-  return flat_map<TransformOutputCalculator<F>>([f = std::move(f)](auto& out, auto&& input){
-    out(std::invoke(f,std::forward<decltype(input)>(input)));
+constexpr auto transform(F f) {
+  return flat_map<TransformOutputCalculator<F>>([f = std::move(f)](auto &out,
+                                                                   auto &&input) {
+    out(std::invoke(f, std::forward<decltype(input)>(input)));
     return true;
   });
 }
-
-
 
 template<typename T>
 using vector_impl = std::vector<std::remove_cvref_t<T>>;
@@ -579,7 +570,7 @@ constexpr auto to_vector() {
 constexpr auto calculate() {
   constexpr std::array v{1, 2, 3, 4};
   auto t = spl::compose(
-      spl::transform([](int i){return i*2;}),
+      spl::transform([](int i) { return i * 2; }),
       spl::filter([](int i) { return i != 2; }),
       spl::sum());
   return spl::apply(v,
