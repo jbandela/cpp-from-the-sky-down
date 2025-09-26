@@ -1,15 +1,17 @@
-cmake_minimum_required(VERSION 3.24)
-project(SkydownSpl VERSION 0.0.1 LANGUAGES CXX)
+# Define the 'spl' library target
+add_library(skydown_spl INTERFACE)
 
-add_library(SkydownSpl INTERFACE)
-
-target_include_directories(SkydownSpl
-        INTERFACE
+# Specify its public include directory
+target_include_directories(skydown_spl INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+        $<INSTALL_INTERFACE:include> # Path when installed
         )
 
-add_library(Skydown::spl ALIAS SkydownSpl)
+# Create a modern, namespaced alias for consumers to use
+add_library(Skydown::spl ALIAS skydown_spl)
 
-set(CMAKE_CXX_STANDARD 23)
-
+# Add this target to the export set for packaging
+install(
+        TARGETS skydown_spl
+        EXPORT SkydownTargets
+)
