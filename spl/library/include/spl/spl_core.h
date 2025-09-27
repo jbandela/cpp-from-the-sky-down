@@ -260,12 +260,12 @@ struct starting_previous {
   }
 };
 
-template<typename Input>
+template<typename Input, processing_style InputProcesingStyle>
 struct starting_factory {
   template<auto, typename>
   using output_type = Input;
-  static constexpr auto input_processing_style = processing_style::complete;
-  static constexpr auto output_processing_style = processing_style::complete;
+  static constexpr auto input_processing_style = InputProcesingStyle;
+  static constexpr auto output_processing_style = InputProcesingStyle;
 
   template<typename, typename Next>
   constexpr auto make(Next &&next) {
@@ -304,7 +304,7 @@ template<typename T>
 using factory_holder_t = typename factory_holder_type<T>::type;
 
 template<typename Input, processing_style PreviousOutputProcessingStyle, typename Factory = starting_factory<
-    Input>, typename Previous = starting_previous>
+    Input, PreviousOutputProcessingStyle>, typename Previous = starting_previous>
 struct input_factory {
   static constexpr auto
       previous_output_processing_style = PreviousOutputProcessingStyle;
@@ -366,9 +366,10 @@ struct input_factory {
 template<typename StartingInput, processing_style starting_processing_style, typename... Stages>
 [[nodiscard]] constexpr auto make_pipeline(Stages &&... stages) {
   detail::starting_previous empty;
-  detail::starting_factory<StartingInput> starting_factory;
+  detail::starting_factory<StartingInput,starting_processing_style> starting_factory;
   return
-      (detail::input_factory<StartingInput, starting_processing_style>{
+      (detail::input_factory<StartingInput, starting_processing_style,
+                             decltype(starting_factory)>{
           starting_factory, empty} + ... + std::forward<
           Stages>(stages)).make(detail::end_stage{});
 

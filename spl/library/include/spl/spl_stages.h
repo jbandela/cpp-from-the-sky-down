@@ -2,8 +2,9 @@
 #define SKYDOWN_SPL_STAGES_H_
 
 #include "spl_core.h"
+#include <map>
 
-namespace spl{
+namespace spl {
 template<typename StageProperties, typename F>
 struct for_each_impl
     : stage_impl<for_each_impl<StageProperties, F>> {
@@ -186,6 +187,69 @@ constexpr auto to_vector() {
   return accumulate_in_place<vector_impl>([](auto &c, auto &&v) {
     c.push_back(std::forward<decltype(v)>(v));
   });
+}
+
+namespace detail {
+
+struct std_map {
+  template<typename K, typename V>
+  using type = std::map<K, V>;
+};
+}
+
+template<typename StageProperties, typename SelectorF, typename Composed, typename MapType = detail::std_map>
+struct group_by_impl
+    : stage_impl<group_by_impl<StageProperties, SelectorF, Composed, MapType>
+    > {
+  using base = typename group_by_impl::base;
+  using typename base::input_type;
+  using key = std::remove_cvref_t<std::invoke_result_t<SelectorF, input_type>>;
+
+  SelectorF selector_f;
+  Composed composed;
+
+  using pipeline_type = decltype(spl::make_pipeline<input_type,
+                                                    processing_style::incremental>(
+      std::declval<Composed>()));
+
+  using output_type = std::pair<key,
+                                std::remove_cvref_t<decltype(std::declval<
+                                    pipeline_type>().finish())>> &&;
+
+  typename MapType::template type<key, pipeline_type> map;
+
+  constexpr decltype(auto) process_incremental(input_type input) {
+    auto copy = [](auto &&t) { return t; };
+    auto k = std::invoke(selector_f, input);
+    auto iter = map.find(k);
+    if (iter == map.end()) {
+      bool b;
+      std::tie(iter, b) = map.emplace(std::move(k),
+                                      spl::make_pipeline<input_type,
+                                                         processing_style::incremental>(
+                                          copy(composed)));
+    }
+    iter->second.process_incremental(static_cast<input_type>(input));
+  }
+
+  constexpr decltype(auto) finish() {
+    for (auto &&[k, v] : map) {
+      this->next.process_incremental(std::make_pair(k, v.finish()));
+    }
+    return this->next.finish();
+  }
+
+};
+
+template<typename MapType = detail::std_map, typename SelectorF, typename... Stages>
+auto group_by(SelectorF selector_f, Stages... stages) {
+  using C = decltype(compose(std::move(stages)...));
+  return stage<group_by_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               SelectorF,
+               C,
+               MapType>(std::move(selector_f), compose(std::move(stages)...));
 }
 
 }
