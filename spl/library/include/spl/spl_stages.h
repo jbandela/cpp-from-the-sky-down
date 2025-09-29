@@ -126,10 +126,9 @@ struct flat_map_impl
   bool done_ = false;
 
   constexpr decltype(auto) process_incremental(input_type input) {
-    auto out = [this](auto &&output) {
-      this->next.process_incremental(std::forward<decltype(output)>(output));
-    };
-    done_ = !std::invoke(f, out, this->forward(input));
+    done_ = !std::invoke(f,
+                         incremental_outputter{this->next},
+                         this->forward(input));
   }
 
   constexpr bool done() const {
@@ -155,13 +154,55 @@ constexpr auto flat_map(F f) {
 
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
-  return flat_map([predicate = std::move(predicate)](auto &output,
+  return flat_map([predicate = std::move(predicate)](auto &&output,
                                                      auto &&input) {
     if (std::invoke(predicate, std::as_const(input))) {
       output(std::forward<decltype(input)>(input));
     }
     return true;
   });
+}
+
+constexpr auto take(size_t
+n) {
+return flat_map([
+i = size_t(0), n
+](
+auto &&output,
+auto &&input
+)mutable {
+if (i++ >= n) return false;
+else {
+output(std::forward<decltype(input)>(input)
+);
+return true;
+
+}
+});
+}
+
+struct iota_struct {
+  size_t n;
+  size_t i = 0;
+  using output_type = size_t;
+};
+
+template<typename Output>
+constexpr bool SkydownSplOutput(iota_struct &is, Output &&output) {
+  for (; is.i < is.n; ++is.i) {
+    if (!output) return false;
+    output(size_t(is.i));
+  }
+  return true;
+}
+
+template<typename Output>
+constexpr bool SkydownSplOutput(iota_struct &&is, Output &&output) {
+  return SkydownSplOutput(is, output);
+}
+
+auto iota(size_t n) {
+  return iota_struct{n};
 }
 
 template<typename F>
@@ -172,7 +213,7 @@ struct TransformOutputCalculator {
 
 template<typename F>
 constexpr auto transform(F f) {
-  return flat_map<TransformOutputCalculator<F>>([f = std::move(f)](auto &out,
+  return flat_map<TransformOutputCalculator<F>>([f = std::move(f)](auto &&out,
                                                                    auto &&input) {
     out(std::invoke(f, std::forward<decltype(input)>(input)));
     return true;

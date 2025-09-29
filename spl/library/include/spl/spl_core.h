@@ -60,17 +60,74 @@ struct adapt_input<Input, PreviousOutputProcessingStyle, InputProcessingStyle> {
   using type = Input;
 };
 
-template<typename Input>
+template<typename Input> requires(std::ranges::range<std::remove_cvref_t<Input>>)
 struct adapt_input<Input,
                    processing_style::complete,
                    processing_style::incremental> {
   using type = std::ranges::range_reference_t<std::remove_reference_t<Input>>;
 };
 
+template<typename T>
+concept has_output_type  = requires { typename std::remove_cvref_t<T>::output_type; };
+
+template<typename Input> requires (has_output_type<std::remove_cvref_t<Input>>)
+struct adapt_input<Input,
+                   processing_style::complete,
+                   processing_style::incremental> {
+  using type = typename std::remove_reference_t<Input>::output_type;
+};
+
 template<typename Input, processing_style PreviousOutputProcessingStyle, processing_style InputProcessingStyle>
 using adapt_input_t = typename adapt_input<Input,
                                            PreviousOutputProcessingStyle,
                                            InputProcessingStyle>::type;
+
+template<typename Impl>
+struct incremental_outputter {
+  Impl &impl;
+
+  constexpr decltype(auto) operator()(auto &&output) {
+    return impl.process_incremental(std::forward<decltype(output)>(output));
+  }
+
+  constexpr operator bool() const {
+    return !impl.done();
+  }
+
+};
+
+template<typename Impl>
+incremental_outputter(Impl &) -> incremental_outputter<Impl>;
+
+template<typename R>
+concept movable_range = std::ranges::range<std::remove_cvref_t<R>>
+    && !std::same_as<decltype(std::ranges::begin(std::declval<R>())),
+                     decltype(std::ranges::begin(std::as_const(std::declval<R>())))>
+    && std::is_rvalue_reference_v<R>;
+
+template<typename R, typename T>
+constexpr decltype(auto) move_if_movable_range(T &&t) requires(std::ranges::range<
+    std::remove_cvref_t<R>>) {
+  return (t);
+}
+
+template<movable_range R, typename T>
+constexpr decltype(auto) move_if_movable_range(T &&t) {
+  return std::move(t);
+}
+
+template<typename R, typename Output>
+constexpr bool SkydownSplOutput(R &&r,
+                                Output &&output)requires(std::ranges::range<std::remove_cvref_t<
+    R>>) {
+  for (auto &&v : std::forward<R>(r)) {
+    if (!output) return true;
+    output(
+        move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
+            v)));
+  }
+  return false;
+}
 
 template<template<typename...> typename Derived, typename StageProperties, typename... Parameters>
 struct stage_impl<Derived<StageProperties, Parameters...>> {
@@ -124,14 +181,10 @@ struct stage_impl<Derived<StageProperties, Parameters...>> {
   previous_output_processing_style == processing_style::complete
       && incremental_input<
           child_type>) {
-    for (auto &&v : static_cast<raw_input_type>(input)) {
-      static_assert(std::is_same_v<decltype(v), input_type>);
-      auto &child = static_cast<child_type &>(*this);
-      if (child.done()) break;
-      child.process_incremental(
-          std::forward<decltype(v)>(v));
-    }
 
+    auto &child = static_cast<child_type &>(*this);
+    SkydownSplOutput(static_cast<raw_input_type>(input),
+                     incremental_outputter{child});
     return static_cast<child_type &>(*this).finish();
 
   }
@@ -304,7 +357,8 @@ template<typename T>
 using factory_holder_t = typename factory_holder_type<T>::type;
 
 template<typename Input, processing_style PreviousOutputProcessingStyle, typename Factory = starting_factory<
-    Input, PreviousOutputProcessingStyle>, typename Previous = starting_previous>
+    Input,
+    PreviousOutputProcessingStyle>, typename Previous = starting_previous>
 struct input_factory {
   static constexpr auto
       previous_output_processing_style = PreviousOutputProcessingStyle;
@@ -366,7 +420,8 @@ struct input_factory {
 template<typename StartingInput, processing_style starting_processing_style, typename... Stages>
 [[nodiscard]] constexpr auto make_pipeline(Stages &&... stages) {
   detail::starting_previous empty;
-  detail::starting_factory<StartingInput,starting_processing_style> starting_factory;
+  detail::starting_factory<StartingInput, starting_processing_style>
+      starting_factory;
   return
       (detail::input_factory<StartingInput, starting_processing_style,
                              decltype(starting_factory)>{
