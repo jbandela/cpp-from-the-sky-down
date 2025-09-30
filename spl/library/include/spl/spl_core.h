@@ -375,13 +375,13 @@ struct input_factory {
   template<typename NewFactory>
   constexpr auto operator+(NewFactory &&new_factory) {
     return input_factory<output_type, output_processing_style,
-                         NewFactory,
+                         std::remove_cvref_t<NewFactory>,
                          input_factory>
         {new_factory, *this};
   }
 
   template<typename F>
-  constexpr auto operator+(composed<F> &&c) {
+  constexpr auto operator+(composed<F>&& c) {
     using ComposedFactory = composed_factory<decltype(c(
         *this)), composed<F>>;
     return input_factory<output_type, output_processing_style,
@@ -389,6 +389,17 @@ struct input_factory {
                          input_factory>
         {ComposedFactory(c), *this};
   }
+
+  template<typename F>
+  constexpr auto operator+(composed<F>& c) {
+    using ComposedFactory = composed_factory<decltype(c(
+        *this)), composed<F>>;
+    return input_factory<output_type, output_processing_style,
+                         ComposedFactory,
+                         input_factory>
+        {ComposedFactory(c), *this};
+  }
+
 
   constexpr auto operator+(end_factory_tag) {
     return end_factory<input_factory>{*this};

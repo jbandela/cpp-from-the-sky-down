@@ -29,6 +29,19 @@ constexpr auto calculate_take() {
 
 }
 
+constexpr auto calculate_take_lvalue_stage() {
+  constexpr std::array v{1, 2, 3, 4};
+  auto t = spl::compose(
+      spl::filter([](int i) { return i != 2; }),
+      spl::sum());
+  auto double_i =   spl::transform([](int i) { return i * 2; });
+  return spl::apply(v,
+                    spl::take(3),
+                    double_i,
+                    t);
+
+}
+
 TEST(SplTest, ConstexprCalculate) {
   static_assert(calculate() == 18);
   EXPECT_THAT(calculate(), 18);
@@ -38,6 +51,12 @@ TEST(SplTest, ConstexprCalculate) {
 TEST(SplTest, ConstexprCalculateTake) {
   static_assert(calculate_take() == 10);
   EXPECT_THAT(calculate_take(), 10);
+
+}
+
+TEST(SplTest, ConstexprCalculateTakeLValueStage) {
+  static_assert(calculate_take_lvalue_stage() == 10);
+  EXPECT_THAT(calculate_take_lvalue_stage(), 10);
 
 }
 
