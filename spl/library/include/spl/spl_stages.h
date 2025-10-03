@@ -221,6 +221,20 @@ constexpr auto transform(F f) {
 }
 
 template<typename T>
+struct FlattenOutputCalculator {
+  template<typename Input>
+  using type = adapt_input_t<Input, processing_style::complete, processing_style::incremental>;
+};
+
+template<typename OutputCalculator = FlattenOutputCalculator<void>>
+constexpr auto flatten() {
+  return flat_map<OutputCalculator>([](auto &&out, auto &&input) {
+     SkydownSplOutput(std::forward<decltype(input)>(input), out);
+     return true;
+  });
+}
+
+template<typename T>
 using vector_impl = std::vector<std::remove_cvref_t<T>>;
 
 constexpr auto to_vector() {

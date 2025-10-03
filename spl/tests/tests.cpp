@@ -88,4 +88,49 @@ TEST(SplTest, Iota) {
 
 }
 
+constexpr auto constexpr_flatten_test() {
+  constexpr std::array<std::array<int, 3>, 2> v{{{1, 2, 3}, {4, 5, 6}}};
+  return spl::apply(v, spl::flatten(), spl::sum());
+}
+
+TEST(SplTest, Flatten) {
+  auto result = constexpr_flatten_test();
+  static_assert(constexpr_flatten_test() == 21);
+  EXPECT_THAT(result, 21);
+}
+
+TEST(SplTest, FlattenToVector) {
+  std::array<std::vector<int>, 3> v{{
+    {1, 2},
+    {3, 4, 5},
+    {6}
+  }};
+
+  auto result = spl::apply(v, spl::flatten(), spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5, 6));
+}
+
+TEST(SplTest, FlattenWithTransform) {
+  constexpr std::array<std::array<int, 2>, 3> v{{{1, 2}, {3, 4}, {5, 6}}};
+
+  auto result = spl::apply(v,
+                           spl::flatten(),
+                           spl::transform([](int i) { return i * 2; }),
+                           spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(2, 4, 6, 8, 10, 12));
+}
+
+TEST(SplTest, FlattenWithTake) {
+  constexpr std::array<std::array<int, 3>, 3> v{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}};
+
+  auto result = spl::apply(v,
+                           spl::flatten(),
+                           spl::take(5),
+                           spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
 }
