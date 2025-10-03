@@ -74,9 +74,17 @@ TEST(SplTest, GroupBy) {
 
 }
 
+
+constexpr auto constexpr_iota_test(){
+
+  return spl::apply(spl::iota(10), spl::sum());
+
+}
+
 TEST(SplTest, Iota) {
-  auto result = spl::apply(spl::iota(3), spl::to_vector());
-  EXPECT_THAT(result, ElementsAre(0, 1, 2));
+  auto result = constexpr_iota_test();
+  static_assert(constexpr_iota_test() == 45);
+  EXPECT_THAT(result, 45);
 
 }
 

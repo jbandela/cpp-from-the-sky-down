@@ -201,7 +201,7 @@ constexpr bool SkydownSplOutput(iota_struct &&is, Output &&output) {
   return SkydownSplOutput(is, output);
 }
 
-auto iota(size_t n) {
+inline constexpr auto iota(size_t n) {
   return iota_struct{n};
 }
 
