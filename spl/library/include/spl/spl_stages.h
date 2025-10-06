@@ -5,17 +5,21 @@
 #include <map>
 
 namespace spl {
-template<typename StageProperties, typename F>
-struct for_each_impl
-    : stage_impl<for_each_impl<StageProperties, F>> {
+// Forward declarations
+template<typename StageProperties, typename InputTypes, typename F>
+struct for_each_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename F>
+struct for_each_impl<StageProperties, types<InputTypes...>, F>
+    : stage_impl<for_each_impl<StageProperties, types<InputTypes...>, F>> {
   using base = typename for_each_impl::base;
-  using typename base::input_type;
-  using output_type = std::monostate &&;
+  using output_types = types<std::monostate&&>;
 
   F f;
 
-  constexpr void process_incremental(input_type input) {
-    f(std::forward<input_type>(input));
+  constexpr void process_incremental(InputTypes... inputs) {
+    f(std::forward<InputTypes>(inputs)...);
   }
 
   constexpr decltype(auto) finish() {
@@ -49,20 +53,25 @@ template<typename T, typename Input>
 using apply_input_to_typename_t = typename apply_input_to_typename<T,
                                                                    Input>::type;
 
-template<typename StageProperties, typename T, typename F>
-struct accumulate_in_place_impl
-    : stage_impl<accumulate_in_place_impl<StageProperties, T, F>
-    > {
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename T, typename F>
+struct accumulate_in_place_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename T, typename F>
+struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
+    : stage_impl<accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>> {
   using base = typename accumulate_in_place_impl::base;
-  using typename base::input_type;
-  using accumulated_type = std::remove_cvref_t<apply_input_to_typename_t<T,
-                                                                         input_type>>;
-  using output_type = accumulated_type &&;
+  // For single-argument case, use the first input type
+  using first_input = std::tuple_element_t<0, std::tuple<InputTypes...>>;
+  using accumulated_type = std::remove_cvref_t<apply_input_to_typename_t<T, first_input>>;
+  static_assert(!std::is_same_v<accumulated_type,void>);
+  using output_types = types<accumulated_type&&>;
   [[no_unique_address]] F f{};
   [[no_unique_address]] accumulated_type accumulated{};
 
-  constexpr decltype(auto) process_incremental(input_type input) {
-    std::invoke(f, accumulated, this->forward(input));
+  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
+    std::invoke(f, accumulated, std::forward<InputTypes>(inputs)...);
   }
 
   constexpr decltype(auto) finish() {
@@ -115,20 +124,23 @@ constexpr auto sum() {
   return accumulate<std::type_identity_t>(std::plus<>{});
 }
 
-template<typename StageProperties, typename F, typename OutputTypeCalculator>
-struct flat_map_impl
-    : stage_impl<flat_map_impl<StageProperties, F, OutputTypeCalculator>
-    > {
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename F, typename OutputTypeCalculator>
+struct flat_map_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename F, typename OutputTypeCalculator>
+struct flat_map_impl<StageProperties, types<InputTypes...>, F, OutputTypeCalculator>
+    : stage_impl<flat_map_impl<StageProperties, types<InputTypes...>, F, OutputTypeCalculator>> {
   using base = typename flat_map_impl::base;
-  using typename base::input_type;
-  using output_type = typename OutputTypeCalculator::template type<input_type> &&;
+  using output_types = typename OutputTypeCalculator::template output_types<InputTypes...>;
   [[no_unique_address]] F f{};
   bool done_ = false;
 
-  constexpr decltype(auto) process_incremental(input_type input) {
+  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
     done_ = !std::invoke(f,
                          incremental_outputter{this->next},
-                         this->forward(input));
+                         static_cast<InputTypes>(inputs)...);
   }
 
   constexpr bool done() const {
@@ -138,8 +150,8 @@ struct flat_map_impl
 };
 
 struct IdentityOutputCalculator {
-  template<typename T>
-  using type = T;
+  template<typename... Ts>
+  using output_types = types<Ts...>;
 };
 
 template<typename OutputCalculator = IdentityOutputCalculator, typename F>
@@ -184,7 +196,7 @@ return true;
 struct iota_struct {
   size_t n;
   size_t i = 0;
-  using output_type = size_t;
+  using output_types = types<size_t&&>;
 };
 
 template<typename Output>
@@ -207,8 +219,8 @@ inline constexpr auto iota(size_t n) {
 
 template<typename F>
 struct TransformOutputCalculator {
-  template<typename Input>
-  using type = std::invoke_result_t<F, Input>;
+  template<typename... Input>
+  using output_types = types<std::invoke_result_t<F, Input...>&&>;
 };
 
 template<typename F>
@@ -223,7 +235,7 @@ constexpr auto transform(F f) {
 template<typename T>
 struct FlattenOutputCalculator {
   template<typename Input>
-  using type = adapt_input_t<Input, processing_style::complete, processing_style::incremental>;
+  using output_types = adapt_input_t<types<Input>, processing_style::complete, processing_style::incremental>;
 };
 
 template<typename OutputCalculator = FlattenOutputCalculator<void>>
@@ -252,39 +264,44 @@ struct std_map {
 };
 }
 
-template<typename StageProperties, typename SelectorF, typename Composed, typename MapType = detail::std_map>
-struct group_by_impl
-    : stage_impl<group_by_impl<StageProperties, SelectorF, Composed, MapType>
-    > {
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename SelectorF, typename Composed, typename MapType = detail::std_map>
+struct group_by_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename SelectorF, typename Composed, typename MapType>
+struct group_by_impl<StageProperties, types<InputTypes...>, SelectorF, Composed, MapType>
+    : stage_impl<group_by_impl<StageProperties, types<InputTypes...>, SelectorF, Composed, MapType>> {
   using base = typename group_by_impl::base;
-  using typename base::input_type;
-  using key = std::remove_cvref_t<std::invoke_result_t<SelectorF, input_type>>;
+  // For single-argument case, use the first input type
+  using first_input = std::tuple_element_t<0, std::tuple<InputTypes...>>;
+  using key = std::remove_cvref_t<std::invoke_result_t<SelectorF, first_input>>;
 
   SelectorF selector_f;
   Composed composed;
 
-  using pipeline_type = decltype(spl::make_pipeline<input_type,
+  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
                                                     processing_style::incremental>(
       std::declval<Composed>()));
 
-  using output_type = std::pair<key,
+  using output_types = types<std::pair<key,
                                 std::remove_cvref_t<decltype(std::declval<
-                                    pipeline_type>().finish())>> &&;
+                                    pipeline_type>().finish())>>&&>;
 
   typename MapType::template type<key, pipeline_type> map;
 
-  constexpr decltype(auto) process_incremental(input_type input) {
+  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
     auto copy = [](auto &&t) { return t; };
-    auto k = std::invoke(selector_f, input);
+    auto k = std::invoke(selector_f, std::forward<InputTypes>(inputs)...);
     auto iter = map.find(k);
     if (iter == map.end()) {
       bool b;
       std::tie(iter, b) = map.emplace(std::move(k),
-                                      spl::make_pipeline<input_type,
+                                      spl::make_pipeline<types<InputTypes...>,
                                                          processing_style::incremental>(
                                           copy(composed)));
     }
-    iter->second.process_incremental(static_cast<input_type>(input));
+    iter->second.process_incremental(std::forward<InputTypes>(inputs)...);
   }
 
   constexpr decltype(auto) finish() {

@@ -133,4 +133,5 @@ TEST(SplTest, FlattenWithTake) {
   EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
 }
 
+
 }

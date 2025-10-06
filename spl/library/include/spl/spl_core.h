@@ -9,6 +9,12 @@
 
 namespace spl {
 
+// Template to hold multiple types - all must be reference types
+template<typename... Ts>
+struct types {
+  static_assert((std::is_reference_v<Ts> && ...), "All types in types<...> must be reference types");
+};
+
 enum class processing_style {
   incremental,
   complete
@@ -39,10 +45,10 @@ template<typename Stage>
 concept complete_output = Stage::output_processing_style
     == processing_style::complete;
 
-template<typename Input, typename Next, processing_style PreviousOutputProcessingStyle,
+template<typename InputTypes, typename Next, processing_style PreviousOutputProcessingStyle,
     processing_style InputProcessingStyle, processing_style OutputProcessingStyle>
 struct stage_properties {
-  using input_type = Input;
+  using input_types = InputTypes;
   using next_type = Next;
   static constexpr auto
       previous_output_processing_style = PreviousOutputProcessingStyle;
@@ -50,31 +56,34 @@ struct stage_properties {
   static constexpr auto output_processing_style = OutputProcessingStyle;
 };
 
-// Handle complete -> incremental conversions
-template<typename Input, processing_style PreviousOutputProcessingStyle, processing_style InputProcessingStyle>
+// Handle complete -> incremental conversions for types<...>
+template<typename InputTypes, processing_style PreviousOutputProcessingStyle, processing_style InputProcessingStyle>
 struct adapt_input;
 
-template<typename Input, processing_style PreviousOutputProcessingStyle, processing_style InputProcessingStyle> requires (
+// When processing styles match, no adaptation needed
+template<typename... InputTypes, processing_style PreviousOutputProcessingStyle, processing_style InputProcessingStyle> requires (
 PreviousOutputProcessingStyle == InputProcessingStyle)
-struct adapt_input<Input, PreviousOutputProcessingStyle, InputProcessingStyle> {
-  using type = Input;
+struct adapt_input<types<InputTypes...>, PreviousOutputProcessingStyle, InputProcessingStyle> {
+  using type = types<InputTypes...>;
 };
 
+// Adapt single-argument range from complete to incremental
 template<typename Input> requires(std::ranges::range<std::remove_cvref_t<Input>>)
-struct adapt_input<Input,
+struct adapt_input<types<Input>,
                    processing_style::complete,
                    processing_style::incremental> {
-  using type = std::ranges::range_reference_t<std::remove_reference_t<Input>>;
+  using type = types<std::ranges::range_reference_t<std::remove_reference_t<Input>>>;
 };
 
 template<typename T>
-concept has_output_type  = requires { typename std::remove_cvref_t<T>::output_type; };
+concept has_output_types  = requires { typename std::remove_cvref_t<T>::output_types; };
 
-template<typename Input> requires (has_output_type<std::remove_cvref_t<Input>>)
-struct adapt_input<Input,
+// Adapt single-argument with output_types from complete to incremental
+template<typename Input> requires (has_output_types<std::remove_cvref_t<Input>>)
+struct adapt_input<types<Input>,
                    processing_style::complete,
                    processing_style::incremental> {
-  using type = typename std::remove_reference_t<Input>::output_type;
+  using type = typename std::remove_reference_t<Input>::output_types;
 };
 
 template<typename Input, processing_style PreviousOutputProcessingStyle, processing_style InputProcessingStyle>
@@ -86,8 +95,8 @@ template<typename Impl>
 struct incremental_outputter {
   Impl &impl;
 
-  constexpr decltype(auto) operator()(auto &&output) {
-    return impl.process_incremental(std::forward<decltype(output)>(output));
+  constexpr decltype(auto) operator()(auto &&...output) {
+    return impl.process_incremental(std::forward<decltype(output)>(output)...);
   }
 
   constexpr operator bool() const {
@@ -129,14 +138,15 @@ constexpr bool SkydownSplOutput(R &&r,
   return false;
 }
 
-template<template<typename...> typename Derived, typename StageProperties, typename... Parameters>
-struct stage_impl<Derived<StageProperties, Parameters...>> {
+// Partial specialization extracting types<...> as second parameter
+template<template<typename...> typename Derived, typename StageProperties, typename... InputTypes, typename... Parameters>
+struct stage_impl<Derived<StageProperties, types<InputTypes...>, Parameters...>> {
 
-  using child_type = Derived<StageProperties, Parameters...>;
+  using child_type = Derived<StageProperties, types<InputTypes...>, Parameters...>;
   using next_type = typename StageProperties::next_type;
   [[no_unique_address]] next_type next;
 
-  using raw_input_type = typename StageProperties::input_type;
+  using input_types = typename StageProperties::input_types;
   using base = stage_impl;
 
   constexpr static auto previous_output_processing_style =
@@ -146,9 +156,6 @@ struct stage_impl<Derived<StageProperties, Parameters...>> {
   constexpr static auto
       output_processing_style = StageProperties::output_processing_style;
 
-  using input_type = adapt_input_t<raw_input_type,
-                                   previous_output_processing_style,
-                                   input_processing_style>;
 
   constexpr stage_impl(next_type &&next)
       : next(std::move(next)) {}
@@ -164,37 +171,27 @@ struct stage_impl<Derived<StageProperties, Parameters...>> {
   }
 
   constexpr void
-  process_incremental(input_type input)requires(incremental_input<
+  process_incremental(InputTypes... inputs)requires(incremental_input<
       child_type>) {
-    return next.process_incremental(static_cast<input_type>(input));
+    return next.process_incremental(std::forward<InputTypes>(inputs)...);
   }
 
   constexpr decltype(auto)
-  process_complete(input_type input)requires(complete_input<
+  process_complete(InputTypes... inputs)requires(complete_input<
       child_type>) {
-    return next.process_complete(static_cast<input_type>(input));
-
-  }
-
-  constexpr decltype(auto)
-  process_complete(raw_input_type input)requires (
-  previous_output_processing_style == processing_style::complete
-      && incremental_input<
-          child_type>) {
-
-    auto &child = static_cast<child_type &>(*this);
-    SkydownSplOutput(static_cast<raw_input_type>(input),
-                     incremental_outputter{child});
-    return static_cast<child_type &>(*this).finish();
+    return next.process_complete(static_cast<InputTypes>(inputs)...);
 
   }
 
   // Utilities
-  constexpr input_type forward(auto &&input) {
-    return static_cast<input_type>(input);
+  template<typename T>
+  constexpr decltype(auto) forward(T &&input) {
+    return std::forward<T>(input);
   }
 
 };
+
+
 
 template<typename T>
 struct instantiable {
@@ -218,13 +215,13 @@ class stage_instantiator {
  public:
   static constexpr auto input_processing_style = InputProcessingStyle;
   static constexpr auto output_processing_style = OutputProcessingStyle;
-  template<processing_style PreviousOutputProcessingStyle, typename Input>
-  using output_type = typename StageImpl<stage_properties<Input,
+  template<processing_style PreviousOutputProcessingStyle, typename InputTypes>
+  using output_types = typename StageImpl<stage_properties<InputTypes,
                                                           std::monostate,
                                                           PreviousOutputProcessingStyle,
                                                           input_processing_style,
-                                                          output_processing_style>,
-                                         TypeParameters...>::output_type;
+                                                          output_processing_style>,InputTypes,
+                                         TypeParameters...>::output_types;
 
   template<typename... Ts>
   constexpr explicit stage_instantiator(Ts &&... ts)
@@ -233,7 +230,7 @@ class stage_instantiator {
   template<typename StageProperties, typename Next>
   constexpr auto make(Next &&next) {
     return std::apply([&](auto &&... ts) {
-      return StageImpl<StageProperties, TypeParameters...>{
+      return StageImpl<StageProperties,typename StageProperties::input_types, TypeParameters...>{
           std::forward<Next>(next),
           std::forward<decltype(ts)>(ts)...};
     }, std::move(parameters_));
@@ -250,6 +247,36 @@ constexpr auto stage(Ts &&... ts) {
                             std::tuple<std::remove_cvref_t<Ts>...>,
                             TypeParameters...>(std::forward<
       decltype(ts)>(ts)...);
+}
+
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes>
+struct values_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename InputType>
+struct values_impl<StageProperties, types<InputType>>
+    : stage_impl<values_impl<StageProperties, types<InputType>>> {
+  using base = typename values_impl::base;
+  using output_types = typename adapt_input<types<InputType>,processing_style::complete,processing_style::incremental>::type;
+
+  constexpr decltype(auto) process_complete(InputType inputs) {
+    std::invoke([](auto&& output, InputType input){
+                  SkydownSplOutput(static_cast<InputType>(input),output);
+
+                },
+                incremental_outputter{this->next},
+                std::forward<InputType>(inputs));
+    return this->next.finish();
+  }
+
+
+};
+
+
+inline constexpr auto values(){
+  return stage<values_impl,processing_style::complete,processing_style::incremental>();
 }
 
 template<typename F>
@@ -313,10 +340,10 @@ struct starting_previous {
   }
 };
 
-template<typename Input, processing_style InputProcesingStyle>
+template<typename InputTypes, processing_style InputProcesingStyle>
 struct starting_factory {
   template<auto, typename>
-  using output_type = Input;
+  using output_types = InputTypes;
   static constexpr auto input_processing_style = InputProcesingStyle;
   static constexpr auto output_processing_style = InputProcesingStyle;
 
@@ -326,15 +353,26 @@ struct starting_factory {
   }
 };
 
-template<typename Factory, typename Composed>
+
+template<typename Composed, bool owning>
+struct composed_type{
+  using type = Composed&;
+};
+
+template<typename Composed>
+struct composed_type<Composed,true>{
+  using type = Composed;
+};
+
+template<typename Factory, typename Composed, bool owning = false>
 struct composed_factory {
   template<processing_style, typename>
-  using output_type = typename Factory::output_type;
+  using output_types = typename Factory::output_types;
   static constexpr auto
       output_processing_style = Factory::output_processing_style;
   static constexpr auto
       input_processing_style = Factory::input_processing_style;
-  Composed &composed;
+  typename composed_type<Composed,owning>::type composed;
 
   template<typename... Ts>
   constexpr auto operator()(Ts &&... ts) {
@@ -348,23 +386,24 @@ struct factory_holder_type {
   using type = F &;
 };
 
-template<typename Factory, typename Composed>
-struct factory_holder_type<composed_factory<Factory, Composed>> {
-  using type = composed_factory<Factory, Composed>;
+template<typename Factory, typename Composed, bool owning>
+struct factory_holder_type<composed_factory<Factory, Composed, owning>> {
+  using type = composed_factory<Factory, Composed, owning>;
 };
 
 template<typename T>
 using factory_holder_t = typename factory_holder_type<T>::type;
 
-template<typename Input, processing_style PreviousOutputProcessingStyle, typename Factory = starting_factory<
-    Input,
+
+template<typename InputTypes, processing_style PreviousOutputProcessingStyle, typename Factory = starting_factory<
+    InputTypes,
     PreviousOutputProcessingStyle>, typename Previous = starting_previous>
 struct input_factory {
   static constexpr auto
       previous_output_processing_style = PreviousOutputProcessingStyle;
-  using output_type = typename Factory::template output_type<
+  using output_types = typename Factory::template output_types<
       previous_output_processing_style,
-      Input>;
+      InputTypes>;
   static constexpr auto
       output_processing_style = Factory::output_processing_style;
   static constexpr auto
@@ -374,17 +413,27 @@ struct input_factory {
 
   template<typename NewFactory>
   constexpr auto operator+(NewFactory &&new_factory) {
-    return input_factory<output_type, output_processing_style,
-                         std::remove_cvref_t<NewFactory>,
-                         input_factory>
-        {new_factory, *this};
-  }
+    if constexpr (output_processing_style == std::remove_cvref_t<NewFactory>::input_processing_style){
+      return input_factory<output_types, output_processing_style,
+                           std::remove_cvref_t<NewFactory>,
+                           input_factory>
+          {new_factory, *this};
+    } else{
+      auto c = compose(values(), std::forward<NewFactory>(new_factory));
+      using ComposedFactory = composed_factory<decltype(c(
+          *this)), decltype(c), true>;
+      return input_factory<output_types, output_processing_style,
+                           ComposedFactory,
+                           input_factory>
+          {ComposedFactory(std::move(c)), *this};
+    }
+ }
 
   template<typename F>
   constexpr auto operator+(composed<F>&& c) {
     using ComposedFactory = composed_factory<decltype(c(
         *this)), composed<F>>;
-    return input_factory<output_type, output_processing_style,
+    return input_factory<output_types, output_processing_style,
                          ComposedFactory,
                          input_factory>
         {ComposedFactory(c), *this};
@@ -394,7 +443,7 @@ struct input_factory {
   constexpr auto operator+(composed<F>& c) {
     using ComposedFactory = composed_factory<decltype(c(
         *this)), composed<F>>;
-    return input_factory<output_type, output_processing_style,
+    return input_factory<output_types, output_processing_style,
                          ComposedFactory,
                          input_factory>
         {ComposedFactory(c), *this};
@@ -415,7 +464,7 @@ struct input_factory {
 
     } else {
       return previous.make(
-          factory.template make<stage_properties<Input,
+          factory.template make<stage_properties<InputTypes,
                                                  Next,
                                                  previous_output_processing_style,
                                                  input_processing_style,
@@ -444,7 +493,7 @@ template<typename StartingInput, processing_style starting_processing_style, typ
 template<typename Range, typename... Stages>
 [[nodiscard]] constexpr auto apply(Range &&range, Stages &&... stages) {
 
-  auto chain = make_pipeline<decltype(range), processing_style::complete>(
+  auto chain = make_pipeline<types<decltype(range)>, processing_style::complete>(
       std::forward<Stages>(stages)...);
   return chain.process_complete(std::forward<Range>(range));
 }
