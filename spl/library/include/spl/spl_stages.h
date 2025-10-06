@@ -14,7 +14,7 @@ template<typename StageProperties, typename... InputTypes, typename F>
 struct for_each_impl<StageProperties, types<InputTypes...>, F>
     : stage_impl<for_each_impl<StageProperties, types<InputTypes...>, F>> {
   using base = typename for_each_impl::base;
-  using output_types = types<std::monostate&&>;
+  using output_types = types<std::monostate &&>;
 
   F f;
 
@@ -60,13 +60,17 @@ struct accumulate_in_place_impl;
 // Partial specialization to extract types from types<...>
 template<typename StageProperties, typename... InputTypes, typename T, typename F>
 struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
-    : stage_impl<accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>> {
+    : stage_impl<accumulate_in_place_impl<StageProperties,
+                                          types<InputTypes...>,
+                                          T,
+                                          F>> {
   using base = typename accumulate_in_place_impl::base;
   // For single-argument case, use the first input type
   using first_input = std::tuple_element_t<0, std::tuple<InputTypes...>>;
-  using accumulated_type = std::remove_cvref_t<apply_input_to_typename_t<T, first_input>>;
-  static_assert(!std::is_same_v<accumulated_type,void>);
-  using output_types = types<accumulated_type&&>;
+  using accumulated_type = std::remove_cvref_t<apply_input_to_typename_t<T,
+                                                                         first_input>>;
+  static_assert(!std::is_same_v<accumulated_type, void>);
+  using output_types = types<accumulated_type &&>;
   [[no_unique_address]] F f{};
   [[no_unique_address]] accumulated_type accumulated{};
 
@@ -130,10 +134,19 @@ struct flat_map_impl;
 
 // Partial specialization to extract types from types<...>
 template<typename StageProperties, typename... InputTypes, typename F, typename OutputTypeCalculator>
-struct flat_map_impl<StageProperties, types<InputTypes...>, F, OutputTypeCalculator>
-    : stage_impl<flat_map_impl<StageProperties, types<InputTypes...>, F, OutputTypeCalculator>> {
+struct flat_map_impl<StageProperties,
+                     types<InputTypes...>,
+                     F,
+                     OutputTypeCalculator>
+    : stage_impl<flat_map_impl<StageProperties,
+                               types<InputTypes...>,
+                               F,
+                               OutputTypeCalculator>> {
   using base = typename flat_map_impl::base;
-  using output_types = typename OutputTypeCalculator::template output_types<InputTypes...>;
+  using output_types = decltype(std::invoke(std::declval<F>(),
+                                            type_calculating_outputter(),
+                                            std::declval<InputTypes>()...));
+  static_assert(is_types<output_types>::value);
   [[no_unique_address]] F f{};
   bool done_ = false;
 
@@ -166,51 +179,64 @@ constexpr auto flat_map(F f) {
 
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
-  return flat_map([predicate = std::move(predicate)](auto &&output,
-                                                     auto &&input) {
-    if (std::invoke(predicate, std::as_const(input))) {
-      output(std::forward<decltype(input)>(input));
+  return flat_map([predicate =
+  std::move(predicate)]<typename Output, typename... Inputs>(Output &&output,
+                                                             Inputs &&... inputs) {
+    if constexpr (calculate_type_v<Output>) {
+
+      return output(std::forward<Inputs>(inputs)...);
+
+    } else {
+      if (std::invoke(predicate, std::as_const(inputs)...)) {
+        output(std::forward<Inputs>(inputs)...);
+      }
+      return true;
     }
-    return true;
   });
 }
 
 constexpr auto take(size_t
-n) {
-return flat_map([
-i = size_t(0), n
-](
-auto &&output,
-auto &&input
-)mutable {
-if (i++ >= n) return false;
-else {
-output(std::forward<decltype(input)>(input)
-);
-return true;
+                    n) {
+  return flat_map([
+                      i = size_t(0), n
+                  ]<typename Out>(
+      Out &&output,
+      auto &&input
+  )mutable {
 
-}
-});
+    if constexpr (calculate_type_v<Out>) {
+      return output(std::forward<decltype(input)>(input)
+      );
+
+    } else {
+      if (i++ >= n) return false;
+      else {
+        output(std::forward<decltype(input)>(input)
+        );
+        return true;
+
+      }
+    }
+  });
 }
 
 struct iota_struct {
   size_t n;
   size_t i = 0;
-  using output_types = types<size_t&&>;
 };
 
-template<typename Output>
-constexpr bool SkydownSplOutput(iota_struct &is, Output &&output) {
-  for (; is.i < is.n; ++is.i) {
-    if (!output) return false;
-    output(size_t(is.i));
+template<typename Output, typename T>
+requires (std::same_as<std::decay_t<T>, iota_struct>)
+constexpr auto SkydownSplOutput(T &&is, Output &&output) {
+  if constexpr (calculate_type_v<Output>) {
+    return output(size_t(is.i));
+  } else {
+    for (; is.i < is.n; ++is.i) {
+      if (!output) return false;
+      output(size_t(is.i));
+    }
+    return true;
   }
-  return true;
-}
-
-template<typename Output>
-constexpr bool SkydownSplOutput(iota_struct &&is, Output &&output) {
-  return SkydownSplOutput(is, output);
 }
 
 inline constexpr auto iota(size_t n) {
@@ -218,31 +244,30 @@ inline constexpr auto iota(size_t n) {
 }
 
 template<typename F>
-struct TransformOutputCalculator {
-  template<typename... Input>
-  using output_types = types<std::invoke_result_t<F, Input...>&&>;
-};
-
-template<typename F>
 constexpr auto transform(F f) {
-  return flat_map<TransformOutputCalculator<F>>([f = std::move(f)](auto &&out,
-                                                                   auto &&input) {
-    out(std::invoke(f, std::forward<decltype(input)>(input)));
-    return true;
+  return flat_map([f = std::move(f)]<typename Out>(Out &&out,
+                                                                   auto &&...inputs) {
+    if constexpr (calculate_type_v<Out>) {
+
+      return out(std::invoke(f, std::forward<decltype(inputs)>(inputs))...);
+
+    } else {
+      out(std::invoke(f, std::forward<decltype(inputs)>(inputs))...);
+      return true;
+
+    }
   });
+
 }
 
-template<typename T>
-struct FlattenOutputCalculator {
-  template<typename Input>
-  using output_types = adapt_input_t<types<Input>, processing_style::complete, processing_style::incremental>;
-};
-
-template<typename OutputCalculator = FlattenOutputCalculator<void>>
 constexpr auto flatten() {
-  return flat_map<OutputCalculator>([](auto &&out, auto &&input) {
-     SkydownSplOutput(std::forward<decltype(input)>(input), out);
-     return true;
+  return flat_map([]<typename Out>(Out &&out, auto &&input) {
+    if constexpr (calculate_type_v<Out>) {
+      return SkydownSplOutput(std::forward<decltype(input)>(input), out);
+    } else {
+    SkydownSplOutput(std::forward<decltype(input)>(input), out);
+    return true;
+  }
   });
 }
 
@@ -270,8 +295,16 @@ struct group_by_impl;
 
 // Partial specialization to extract types from types<...>
 template<typename StageProperties, typename... InputTypes, typename SelectorF, typename Composed, typename MapType>
-struct group_by_impl<StageProperties, types<InputTypes...>, SelectorF, Composed, MapType>
-    : stage_impl<group_by_impl<StageProperties, types<InputTypes...>, SelectorF, Composed, MapType>> {
+struct group_by_impl<StageProperties,
+                     types<InputTypes...>,
+                     SelectorF,
+                     Composed,
+                     MapType>
+    : stage_impl<group_by_impl<StageProperties,
+                               types<InputTypes...>,
+                               SelectorF,
+                               Composed,
+                               MapType>> {
   using base = typename group_by_impl::base;
   // For single-argument case, use the first input type
   using first_input = std::tuple_element_t<0, std::tuple<InputTypes...>>;
@@ -285,8 +318,8 @@ struct group_by_impl<StageProperties, types<InputTypes...>, SelectorF, Composed,
       std::declval<Composed>()));
 
   using output_types = types<std::pair<key,
-                                std::remove_cvref_t<decltype(std::declval<
-                                    pipeline_type>().finish())>>&&>;
+                                       std::remove_cvref_t<decltype(std::declval<
+                                           pipeline_type>().finish())>> &&>;
 
   typename MapType::template type<key, pipeline_type> map;
 
