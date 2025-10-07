@@ -34,7 +34,7 @@ constexpr auto calculate_take_lvalue_stage() {
   auto t = spl::compose(
       spl::filter([](int i) { return i != 2; }),
       spl::sum());
-  auto double_i =   spl::transform([](int i) { return i * 2; });
+  auto double_i = spl::transform([](int i) { return i * 2; });
   return spl::apply(v,
                     spl::take(3),
                     double_i,
@@ -74,8 +74,7 @@ TEST(SplTest, GroupBy) {
 
 }
 
-
-constexpr auto constexpr_iota_test(){
+constexpr auto constexpr_iota_test() {
 
   return spl::apply(spl::iota(10), spl::sum());
 
@@ -101,10 +100,10 @@ TEST(SplTest, Flatten) {
 
 TEST(SplTest, FlattenToVector) {
   std::array<std::vector<int>, 3> v{{
-    {1, 2},
-    {3, 4, 5},
-    {6}
-  }};
+                                        {1, 2},
+                                        {3, 4, 5},
+                                        {6}
+                                    }};
 
   auto result = spl::apply(v, spl::flatten(), spl::to_vector());
 
@@ -123,7 +122,8 @@ TEST(SplTest, FlattenWithTransform) {
 }
 
 TEST(SplTest, FlattenWithTake) {
-  constexpr std::array<std::array<int, 3>, 3> v{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}};
+  constexpr std::array<std::array<int, 3>, 3>
+      v{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}};
 
   auto result = spl::apply(v,
                            spl::flatten(),
@@ -132,6 +132,27 @@ TEST(SplTest, FlattenWithTake) {
 
   EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
 }
+#if 1
+TEST(SplTest, FlattenMultipleArgs) {
+  // Test that flatten() now works with multiple arguments by flattening the last one
+  std::array<std::pair<std::string, std::vector<int>>, 2> v{{
+                                                                {"a",
+                                                                 {1, 2, 3}},
+                                                                {"b", {4, 5}}
+                                                            }};
 
+  auto result = spl::apply(v,
+                           spl::expand_tuple(),
+                           spl::flatten(),
+                           spl::make_pair(),
+                           spl::to_vector());
+
+  using pair_type = std::pair<std::string, int>;
+  EXPECT_THAT(result, ElementsAre(
+      pair_type{"a", 1}, pair_type{"a", 2}, pair_type{"a", 3},
+      pair_type{"b", 4}, pair_type{"b", 5}
+  ));
+}
+#endif
 
 }

@@ -244,30 +244,65 @@ inline constexpr auto iota(size_t n) {
 }
 
 template<typename F>
-constexpr auto transform(F f) {
+constexpr auto transform_cps(F f) {
   return flat_map([f = std::move(f)]<typename Out>(Out &&out,
                                                                    auto &&...inputs) {
+
+    auto invoke = [&]{return std::invoke(f,std::forward<decltype(out)>(out), std::forward<decltype(inputs)>(inputs)...);};
     if constexpr (calculate_type_v<Out>) {
 
-      return out(std::invoke(f, std::forward<decltype(inputs)>(inputs))...);
+      return invoke();
 
     } else {
-      out(std::invoke(f, std::forward<decltype(inputs)>(inputs))...);
+      invoke();
       return true;
-
     }
   });
+}
 
+template<typename F>
+constexpr auto transform(F f){
+  return transform_cps([f = std::move(f)](auto&& out, auto&&... inputs){
+    return out(std::invoke(f,std::forward<decltype(inputs)>(inputs)...));
+  });
+}
+
+
+inline constexpr auto expand_tuple(){
+  return transform_cps([&](auto&& out, auto&& tuple){
+    return std::apply(out,std::forward<decltype(tuple)>(tuple));
+  });
+}
+
+inline constexpr auto make_tuple(){
+  return transform_cps([&](auto&& out, auto&&... ts){
+    return out(std::make_tuple(std::forward<decltype(ts)>(ts)...));
+  });
+}
+inline constexpr auto make_pair(){
+  return transform_cps([&](auto&& out, auto&&... ts){
+    return out(std::make_pair(std::forward<decltype(ts)>(ts)...));
+  });
 }
 
 constexpr auto flatten() {
-  return flat_map([]<typename Out>(Out &&out, auto &&input) {
+  return flat_map([]<typename Out>(Out &&out, auto &&...inputs) {
+    auto invoke =      [&]{
+      return invoke_with_last_first(
+          [&](auto &&last, auto&&... inputs) {
+            return SkydownSplOutput(std::forward<decltype(last)>(last),as_outputter(out,[&](auto&& out, auto&& item){
+              return out(std::forward<decltype(inputs)>(inputs)..., std::forward<decltype(item)>(item));
+            }));
+          },
+          std::forward<decltype(inputs)>(inputs)...);
+    };
+
     if constexpr (calculate_type_v<Out>) {
-      return SkydownSplOutput(std::forward<decltype(input)>(input), out);
+      return invoke();
     } else {
-    SkydownSplOutput(std::forward<decltype(input)>(input), out);
-    return true;
-  }
+      invoke();
+      return true;
+    }
   });
 }
 

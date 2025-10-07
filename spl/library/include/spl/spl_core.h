@@ -89,8 +89,41 @@ struct type_calculating_outputter {
 
 };
 
+template<typename Outputter, typename F>
+struct as_outputter:Outputter{
+  F f;
+  constexpr decltype(auto) operator()(auto &&...ts) {
+    return std::invoke(f,static_cast<Outputter&>(*this), std::forward<decltype(ts)>(ts)...);
+  }
+
+};
+
+template<typename Outputter, typename F>
+as_outputter(Outputter&, F) -> as_outputter<Outputter,F>;
+
 template<typename T>
 constexpr bool calculate_type_v = std::remove_cvref_t<T>::calculate_type;
+
+// Helper to invoke a callable with the last argument first
+template<typename F, typename... Args>
+constexpr decltype(auto) invoke_with_last_first(F&& f, Args&&... args) {
+  if constexpr (sizeof...(Args) == 0) {
+    return std::invoke(std::forward<F>(f));
+  } else if constexpr (sizeof...(Args) == 1) {
+    return std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+  } else {
+    return []<std::size_t... Is>(F&& func, auto&& tuple, std::index_sequence<Is...>) {
+      constexpr std::size_t last = sizeof...(Is);
+      return std::invoke(
+        std::forward<F>(func),
+        std::get<last>(std::forward<decltype(tuple)>(tuple)),
+        std::get<Is>(std::forward<decltype(tuple)>(tuple))...
+      );
+    }(std::forward<F>(f),
+      std::forward_as_tuple(std::forward<Args>(args)...),
+      std::make_index_sequence<sizeof...(Args) - 1>{});
+  }
+}
 
 
 template<typename Impl>
@@ -439,7 +472,7 @@ struct input_factory {
   template<typename F>
   constexpr auto operator+(composed<F> &&c) {
     using ComposedFactory = composed_factory<decltype(c(
-        *this)), composed<F>>;
+         *this)), composed<F>>;
     return input_factory<output_types, output_processing_style,
                          ComposedFactory,
                          input_factory>
