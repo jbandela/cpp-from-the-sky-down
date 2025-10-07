@@ -157,7 +157,7 @@ struct flat_map_impl<StageProperties,
   }
 
   constexpr bool done() const {
-    return done_;
+    return done_ || this->next.done();
   }
 
 };
@@ -201,17 +201,17 @@ constexpr auto take(size_t
                       i = size_t(0), n
                   ]<typename Out>(
       Out &&output,
-      auto &&input
+      auto &&...inputs
   )mutable {
 
     if constexpr (calculate_type_v<Out>) {
-      return output(std::forward<decltype(input)>(input)
+      return output(std::forward<decltype(inputs)>(inputs)...
       );
 
     } else {
       if (i++ >= n) return false;
       else {
-        output(std::forward<decltype(input)>(input)
+        output(std::forward<decltype(inputs)>(inputs)...
         );
         return true;
 
@@ -234,10 +234,10 @@ constexpr auto SkydownSplOutput(Output &&output, T &&is) {
     return output(size_t(is.current));
   } else {
     for (; is.current < is.end; ++is.current) {
-      if (!output) return false;
+      if (!output) return true;
       output(size_t(is.current));
     }
-    return true;
+    return false;
   }
 }
 
@@ -321,8 +321,7 @@ constexpr auto flatten() {
     if constexpr (calculate_type_v<Out>) {
       return invoke();
     } else {
-      invoke();
-      return true;
+      return !invoke();
     }
   });
 }

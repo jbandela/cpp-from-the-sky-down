@@ -487,4 +487,53 @@ TEST(SplTest, SwizzleSingle) {
   EXPECT_THAT(constexpr_swizzle_single_test(), 15);
 }
 
+auto PythagoreanTriples() {
+  auto zip_flat = [](auto f) {
+    return spl::compose(spl::zip_result(f), spl::flatten());
+  };
+  return spl::compose(
+      spl::iota(1),
+      zip_flat([](int c) { return spl::iota(1, c + 1); }),
+      zip_flat([](int c, int a) { return spl::iota(a, c + 1); }),
+      spl::filter([](int c, int a, int b) { return a * a + b * b == c * c; }),
+      spl::swizzle<1, 2, 0>()
+  );
+
 }
+
+
+TEST(SplTest, PythagoreanTriples){
+
+  auto zip_flat = [](auto f) {
+    return spl::compose(spl::zip_result(f), spl::flatten());
+  };
+  auto triples = spl::apply(
+      spl::iota(1),
+      zip_flat([](int c) { return spl::iota(1, c + 1); }),
+      zip_flat([](int c, int a) { return spl::iota(a, c + 1); }),
+      spl::filter([](int c, int a, int b) { return a * a + b * b == c * c; }),
+      spl::swizzle<1, 2, 0>(),
+      spl::take(10),
+      spl::make_tuple(),
+      spl::to_vector()
+  );
+
+  using triple = std::tuple<int, int, int>;
+  EXPECT_THAT(triples, ElementsAre(
+      triple{3, 4, 5},
+      triple{6, 8, 10},
+      triple{5, 12, 13},
+      triple{9, 12, 15},
+      triple{8, 15, 17},
+      triple{12, 16, 20},
+      triple{7, 24, 25},
+      triple{15, 20, 25},
+      triple{10, 24, 26},
+      triple{20, 21, 29}
+  ));
+
+}
+
+
+}
+
