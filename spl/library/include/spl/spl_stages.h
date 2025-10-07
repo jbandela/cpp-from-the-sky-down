@@ -298,6 +298,14 @@ constexpr auto zip_result(F f) {
   });
 }
 
+template<std::size_t... Indices>
+constexpr auto swizzle() {
+  return transform_cps([](auto&& out, auto&&... inputs) {
+    auto tuple = std::forward_as_tuple(std::forward<decltype(inputs)>(inputs)...);
+    return out(std::get<Indices>(std::move(tuple))...);
+  });
+}
+
 constexpr auto flatten() {
   return flat_map([]<typename Out>(Out &&out, auto &&...inputs) {
     auto invoke =      [&]{

@@ -212,4 +212,66 @@ TEST(SplTest, ZipResultMultipleArgs) {
   EXPECT_THAT(result, ElementsAre(triple{1, 2, 3}, triple{3, 4, 7}, triple{5, 6, 11}));
 }
 
+TEST(SplTest, SwizzleReorder) {
+  std::array<std::tuple<int, int, int>, 2> v{{
+      {1, 2, 3},
+      {4, 5, 6}
+  }};
+
+  auto result = spl::apply(v,
+                           spl::expand_tuple(),
+                           spl::swizzle<2, 0, 1>(),
+                           spl::make_tuple(),
+                           spl::to_vector());
+
+  using triple = std::tuple<int, int, int>;
+  EXPECT_THAT(result, ElementsAre(triple{3, 1, 2}, triple{6, 4, 5}));
+}
+
+TEST(SplTest, SwizzleFilter) {
+  std::array<std::tuple<int, int, int>, 2> v{{
+      {1, 2, 3},
+      {4, 5, 6}
+  }};
+
+  auto result = spl::apply(v,
+                           spl::expand_tuple(),
+                           spl::swizzle<2, 0>(),
+                           spl::make_pair(),
+                           spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(Pair(3, 1), Pair(6, 4)));
+}
+
+TEST(SplTest, SwizzleDuplicate) {
+  std::array<std::pair<int, int>, 2> v{{
+      {1, 2},
+      {3, 4}
+  }};
+
+  auto result = spl::apply(v,
+                           spl::expand_tuple(),
+                           spl::swizzle<0, 0, 1>(),
+                           spl::make_tuple(),
+                           spl::to_vector());
+
+  using triple = std::tuple<int, int, int>;
+  EXPECT_THAT(result, ElementsAre(triple{1, 1, 2}, triple{3, 3, 4}));
+}
+
+TEST(SplTest, SwizzleSingle) {
+  std::array<std::tuple<int, int, int>, 3> v{{
+      {1, 2, 3},
+      {4, 5, 6},
+      {7, 8, 9}
+  }};
+
+  auto result = spl::apply(v,
+                           spl::expand_tuple(),
+                           spl::swizzle<1>(),
+                           spl::sum());
+
+  EXPECT_THAT(result, 15); // 2 + 5 + 8
+}
+
 }
