@@ -6,6 +6,74 @@ namespace {
 using ::testing::Pair;
 using ::testing::ElementsAre;
 
+// Constexpr-compatible map implementation using std::array with std::optional
+template<typename K, typename V, std::size_t MaxSize = 10>
+struct constexpr_map {
+  std::array<std::optional<std::pair<K, V>>, MaxSize> data{};
+  std::size_t count = 0;
+
+  struct iterator {
+    std::optional<std::pair<K, V>>* ptr;
+
+    constexpr std::pair<K, V>& operator*() const { return **ptr; }
+    constexpr std::pair<K, V>* operator->() const { return &**ptr; }
+    constexpr iterator& operator++() { ++ptr; return *this; }
+    constexpr bool operator==(const iterator& other) const { return ptr == other.ptr; }
+    constexpr bool operator!=(const iterator& other) const { return ptr != other.ptr; }
+  };
+
+  struct const_iterator {
+    const std::optional<std::pair<K, V>>* ptr;
+
+    constexpr const std::pair<K, V>& operator*() const { return **ptr; }
+    constexpr const std::pair<K, V>* operator->() const { return &**ptr; }
+    constexpr const_iterator& operator++() { ++ptr; return *this; }
+    constexpr bool operator==(const const_iterator& other) const { return ptr == other.ptr; }
+    constexpr bool operator!=(const const_iterator& other) const { return ptr != other.ptr; }
+  };
+
+  constexpr iterator begin() { return iterator{data.data()}; }
+  constexpr iterator end() { return iterator{data.data() + count}; }
+  constexpr const_iterator begin() const { return const_iterator{data.data()}; }
+  constexpr const_iterator end() const { return const_iterator{data.data() + count}; }
+
+  constexpr iterator find(const K& key) {
+    for (std::size_t i = 0; i < count; ++i) {
+      if (data[i]->first == key) {
+        return iterator{data.data() + i};
+      }
+    }
+    return end();
+  }
+
+  constexpr const_iterator find(const K& key) const {
+    for (std::size_t i = 0; i < count; ++i) {
+      if (data[i]->first == key) {
+        return const_iterator{data.data() + i};
+      }
+    }
+    return end();
+  }
+
+  template<typename... Args>
+  constexpr std::pair<iterator, bool> emplace(K key, Args&&... args) {
+    auto it = find(key);
+    if (it != end()) {
+      return {it, false};
+    }
+    data[count].emplace(std::move(key), V(std::forward<Args>(args)...));
+    ++count;
+    return {iterator{data.data() + (count - 1)}, true};
+  }
+};
+
+// Wrapper struct for constexpr_map to use with group_by
+template<std::size_t MaxSize = 10>
+struct constexpr_map_factory {
+  template<typename K, typename V>
+  using type = constexpr_map<K, V, MaxSize>;
+};
+
 constexpr auto calculate() {
   constexpr std::array v{1, 2, 3, 4};
   auto t = spl::compose(
@@ -60,8 +128,22 @@ TEST(SplTest, ConstexprCalculateTakeLValueStage) {
 
 }
 
+constexpr auto constexpr_group_by_test() {
+  using pair = std::pair<int, int>;
+  constexpr std::array v{pair{1, 2}, pair{2, 4}, pair{1, 1}};
+
+  return spl::apply(v,
+                    spl::group_by<constexpr_map_factory<>>(&pair::first,
+                                                           spl::transform(&pair::second),
+                                                           spl::sum()),
+                    spl::transform([](auto&& p) { return p.second; }),
+                    spl::sum());
+}
+
 TEST(SplTest, GroupBy) {
-  // Note: group_by cannot be constexpr because std::map is not constexpr-compatible
+  static_assert(constexpr_group_by_test() == 7); // group 1: 2+1=3, group 2: 4, sum: 3+4=7
+  EXPECT_THAT(constexpr_group_by_test(), 7);
+
   using pair = std::pair<std::string, int>;
   std::array v{pair{"a", 2}, pair{"b", 4}, pair{"a", 1}};
 

@@ -403,7 +403,7 @@ struct group_by_impl<StageProperties,
 };
 
 template<typename MapType = detail::std_map, typename SelectorF, typename... Stages>
-auto group_by(SelectorF selector_f, Stages... stages) {
+constexpr auto group_by(SelectorF selector_f, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
   return stage<group_by_impl,
                processing_style::incremental,
