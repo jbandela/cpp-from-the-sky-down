@@ -1,0 +1,12 @@
+# CMake build directories
+cmake-build-*/
+build/
+
+# JetBrains IDEs
+.idea/
+
+# macOS
+.DS_Store
+
+# Rust
+target/
