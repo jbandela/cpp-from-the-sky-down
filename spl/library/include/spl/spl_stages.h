@@ -229,7 +229,7 @@ struct iota_struct:iota_struct_base {
 
 template<typename Output, typename T>
 requires (std::is_base_of_v<iota_struct_base,std::decay_t<T>>)
-constexpr auto SkydownSplOutput(T &&is, Output &&output) {
+constexpr auto SkydownSplOutput(Output &&output, T &&is) {
   if constexpr (calculate_type_v<Output>) {
     return output(size_t(is.i));
   } else {
@@ -296,9 +296,9 @@ constexpr auto flatten() {
     auto invoke =      [&]{
       return invoke_with_last_first(
           [&](auto &&last, auto&&... inputs) {
-            return SkydownSplOutput(std::forward<decltype(last)>(last),as_outputter(out,[&](auto&& out, auto&& item){
+            return SkydownSplOutput(as_outputter(out,[&](auto&& out, auto&& item){
               return out(std::forward<decltype(inputs)>(inputs)..., std::forward<decltype(item)>(item));
-            }));
+            }), std::forward<decltype(last)>(last));
           },
           std::forward<decltype(inputs)>(inputs)...);
     };

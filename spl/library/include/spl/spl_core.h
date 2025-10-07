@@ -146,9 +146,9 @@ constexpr decltype(auto) move_if_movable_range(T &&t) {
   return std::move(t);
 }
 
-template<typename R, typename Output>
-constexpr auto SkydownSplOutput(R &&r,
-                                Output &&output)requires(std::ranges::range<std::remove_cvref_t<
+template<typename Output, typename R>
+constexpr auto SkydownSplOutput(Output &&output,
+                                R &&r)requires(std::ranges::range<std::remove_cvref_t<
     R>>) {
   if constexpr (calculate_type_v<Output>) {
     auto &&v = *r.begin();
@@ -295,13 +295,13 @@ struct values_impl<StageProperties, types<InputType>>
     : stage_impl<values_impl<StageProperties, types<InputType>>> {
   using base = typename values_impl::base;
 
-using output_types =  decltype( SkydownSplOutput(std::declval<InputType>(), type_calculating_outputter()));
+using output_types =  decltype( SkydownSplOutput(type_calculating_outputter(), std::declval<InputType>()));
 
 static_assert(is_types<output_types>::value);
 
   constexpr decltype(auto) process_complete(InputType inputs) {
     std::invoke([](auto &&output, InputType input) {
-                  SkydownSplOutput(static_cast<InputType>(input), output);
+                  SkydownSplOutput(output, static_cast<InputType>(input));
 
                 },
                 incremental_outputter{this->next},
