@@ -80,12 +80,28 @@ constexpr auto constexpr_iota_test() {
 
 }
 
+
+
 TEST(SplTest, Iota) {
   auto result = constexpr_iota_test();
   static_assert(constexpr_iota_test() == 45);
   EXPECT_THAT(result, 45);
 
 }
+
+constexpr auto constexpr_bounded_iota_test() {
+
+  return spl::apply(spl::iota(2,5), spl::sum());
+
+}
+
+TEST(SplTest, BoundedIota) {
+  auto result = constexpr_bounded_iota_test();
+  static_assert(constexpr_bounded_iota_test() == 9);
+  EXPECT_THAT(result, 9);
+
+}
+
 
 constexpr auto constexpr_flatten_test() {
   constexpr std::array<std::array<int, 3>, 2> v{{{1, 2, 3}, {4, 5, 6}}};
