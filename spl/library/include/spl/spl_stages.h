@@ -291,6 +291,13 @@ inline constexpr auto make_pair(){
   });
 }
 
+template<typename F>
+constexpr auto zip_result(F f) {
+  return transform_cps([f = std::move(f)](auto&& out, auto&&... inputs) {
+    return out(std::forward<decltype(inputs)>(inputs)..., std::invoke(f, std::as_const(inputs)...));
+  });
+}
+
 constexpr auto flatten() {
   return flat_map([]<typename Out>(Out &&out, auto &&...inputs) {
     auto invoke =      [&]{

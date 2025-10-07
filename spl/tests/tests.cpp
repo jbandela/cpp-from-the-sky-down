@@ -171,4 +171,45 @@ TEST(SplTest, FlattenMultipleArgs) {
 }
 #endif
 
+constexpr auto constexpr_zip_result_test() {
+  constexpr std::array v{1, 2, 3, 4};
+  return spl::apply(v,
+                    spl::zip_result([](int i) { return i * 2; }),
+                    spl::transform([](int orig, int doubled) { return orig + doubled; }),
+                    spl::sum());
+}
+
+TEST(SplTest, ZipResult) {
+  auto result = constexpr_zip_result_test();
+  static_assert(constexpr_zip_result_test() == 30); // 1+2 + 2+4 + 3+6 + 4+8 = 3+6+9+12 = 30
+  EXPECT_THAT(result, 30);
+}
+
+TEST(SplTest, ZipResultToVector) {
+  std::array v{1, 2, 3};
+  auto result = spl::apply(v,
+                           spl::zip_result([](int i) { return i * i; }),
+                           spl::make_pair(),
+                           spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(Pair(1, 1), Pair(2, 4), Pair(3, 9)));
+}
+
+TEST(SplTest, ZipResultMultipleArgs) {
+  std::array<std::pair<int, int>, 3> v{{
+      {1, 2},
+      {3, 4},
+      {5, 6}
+  }};
+
+  auto result = spl::apply(v,
+                           spl::expand_tuple(),
+                           spl::zip_result([](int a, int b) { return a + b; }),
+                           spl::make_tuple(),
+                           spl::to_vector());
+
+  using triple = std::tuple<int, int, int>;
+  EXPECT_THAT(result, ElementsAre(triple{1, 2, 3}, triple{3, 4, 7}, triple{5, 6, 11}));
+}
+
 }
