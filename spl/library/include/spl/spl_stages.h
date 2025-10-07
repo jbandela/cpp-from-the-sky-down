@@ -223,30 +223,30 @@ constexpr auto take(size_t
 struct iota_struct_base{};
 template<typename T>
 struct iota_struct:iota_struct_base {
-  T n;
-  T i = 0;
+  T end;
+  T current;
 };
 
 template<typename Output, typename T>
 requires (std::is_base_of_v<iota_struct_base,std::decay_t<T>>)
 constexpr auto SkydownSplOutput(Output &&output, T &&is) {
   if constexpr (calculate_type_v<Output>) {
-    return output(size_t(is.i));
+    return output(size_t(is.current));
   } else {
-    for (; is.i < is.n; ++is.i) {
+    for (; is.current < is.end; ++is.current) {
       if (!output) return false;
-      output(size_t(is.i));
+      output(size_t(is.current));
     }
     return true;
   }
 }
 
-inline constexpr auto iota(size_t n) {
-  return iota_struct<size_t>{{},n};
+inline constexpr auto iota(size_t start) {
+  return iota_struct<size_t>{{}, std::numeric_limits<size_t>::max(), start};
 }
 
-inline constexpr auto iota(size_t i, size_t bound) {
-  return iota_struct<size_t>{{},bound, i};
+inline constexpr auto iota(size_t start, size_t end) {
+  return iota_struct<size_t>{{}, end, start};
 }
 
 template<typename F>

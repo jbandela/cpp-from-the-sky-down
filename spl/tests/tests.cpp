@@ -76,7 +76,7 @@ TEST(SplTest, GroupBy) {
 
 constexpr auto constexpr_iota_test() {
 
-  return spl::apply(spl::iota(10), spl::sum());
+  return spl::apply(spl::iota(0, 10), spl::sum());
 
 }
 
@@ -91,15 +91,25 @@ TEST(SplTest, Iota) {
 
 constexpr auto constexpr_bounded_iota_test() {
 
-  return spl::apply(spl::iota(2,5), spl::sum());
+  return spl::apply(spl::iota(2, 5), spl::sum());
 
 }
 
 TEST(SplTest, BoundedIota) {
   auto result = constexpr_bounded_iota_test();
-  static_assert(constexpr_bounded_iota_test() == 9);
+  static_assert(constexpr_bounded_iota_test() == 9); // 2 + 3 + 4 = 9
   EXPECT_THAT(result, 9);
 
+}
+
+constexpr auto constexpr_unbounded_iota_test() {
+  return spl::apply(spl::iota(5), spl::take(3), spl::sum());
+}
+
+TEST(SplTest, UnboundedIota) {
+  auto result = constexpr_unbounded_iota_test();
+  static_assert(constexpr_unbounded_iota_test() == 18); // 5 + 6 + 7 = 18
+  EXPECT_THAT(result, 18);
 }
 
 
