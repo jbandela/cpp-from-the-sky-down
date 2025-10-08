@@ -220,15 +220,15 @@ constexpr auto take(size_t
   });
 }
 
-struct iota_struct_base{};
+struct iota_struct_base {};
 template<typename T>
-struct iota_struct:iota_struct_base {
+struct iota_struct : iota_struct_base {
   T end;
   T current;
 };
 
 template<typename Output, typename T>
-requires (std::is_base_of_v<iota_struct_base,std::decay_t<T>>)
+requires(std::is_base_of_v<iota_struct_base, std::decay_t<T>>)
 constexpr auto SkydownSplOutput(Output &&output, T &&is) {
   if constexpr (calculate_type_v<Output>) {
     return output(size_t(is.current));
@@ -252,9 +252,13 @@ inline constexpr auto iota(size_t start, size_t end) {
 template<typename F>
 constexpr auto transform_cps(F f) {
   return flat_map([f = std::move(f)]<typename Out>(Out &&out,
-                                                                   auto &&...inputs) {
+                                                   auto &&...inputs) {
 
-    auto invoke = [&]{return std::invoke(f,std::forward<decltype(out)>(out), std::forward<decltype(inputs)>(inputs)...);};
+    auto invoke = [&] {
+      return std::invoke(f,
+                         std::forward<decltype(out)>(out),
+                         std::forward<decltype(inputs)>(inputs)...);
+    };
     if constexpr (calculate_type_v<Out>) {
 
       return invoke();
@@ -267,62 +271,61 @@ constexpr auto transform_cps(F f) {
 }
 
 template<typename F>
-constexpr auto transform(F f){
-  return transform_cps([f = std::move(f)](auto&& out, auto&&... inputs){
-    return out(std::invoke(f,std::forward<decltype(inputs)>(inputs)...));
+constexpr auto transform(F f) {
+  return transform_cps([f = std::move(f)](auto &&out, auto &&... inputs) {
+    return out(std::invoke(f, std::forward<decltype(inputs)>(inputs)...));
   });
 }
 
-
-inline constexpr auto expand_tuple(){
-  return transform_cps([&](auto&& out, auto&& tuple){
-    return std::apply(out,std::forward<decltype(tuple)>(tuple));
+inline constexpr auto expand_tuple() {
+  return transform_cps([&](auto &&out, auto &&tuple) {
+    return std::apply(out, std::forward<decltype(tuple)>(tuple));
   });
 }
 
-inline constexpr auto make_tuple(){
-  return transform_cps([&](auto&& out, auto&&... ts){
+inline constexpr auto make_tuple() {
+  return transform_cps([&](auto &&out, auto &&... ts) {
     return out(std::make_tuple(std::forward<decltype(ts)>(ts)...));
   });
 }
-inline constexpr auto make_pair(){
-  return transform_cps([&](auto&& out, auto&&... ts){
+inline constexpr auto make_pair() {
+  return transform_cps([&](auto &&out, auto &&... ts) {
     return out(std::make_pair(std::forward<decltype(ts)>(ts)...));
   });
 }
 
 template<typename F>
 constexpr auto zip_result(F f) {
-  return transform_cps([f = std::move(f)](auto&& out, auto&&... inputs) {
-    return out(std::forward<decltype(inputs)>(inputs)..., std::invoke(f, std::as_const(inputs)...));
+  return transform_cps([f = std::move(f)](auto &&out, auto &&... inputs) {
+    return out(std::forward<decltype(inputs)>(inputs)...,
+               std::invoke(f, std::as_const(inputs)...));
   });
 }
 
 template<std::size_t... Indices>
 constexpr auto swizzle() {
-  return transform_cps([](auto&& out, auto&&... inputs) {
-    auto tuple = std::forward_as_tuple(std::forward<decltype(inputs)>(inputs)...);
+  return transform_cps([](auto &&out, auto &&... inputs) {
+    auto tuple =
+        std::forward_as_tuple(std::forward<decltype(inputs)>(inputs)...);
     return out(std::get<Indices>(std::move(tuple))...);
   });
 }
 
 constexpr auto flatten() {
   return flat_map([]<typename Out>(Out &&out, auto &&...inputs) {
-    auto invoke =      [&]{
-      return invoke_with_last_first(
-          [&](auto &&last, auto&&... inputs) {
-            return SkydownSplOutput(as_outputter(out,[&](auto&& out, auto&& item){
-              return out(std::forward<decltype(inputs)>(inputs)..., std::forward<decltype(item)>(item));
-            }), std::forward<decltype(last)>(last));
-          },
-          std::forward<decltype(inputs)>(inputs)...);
-    };
-
-    if constexpr (calculate_type_v<Out>) {
-      return invoke();
-    } else {
-      return invoke();
-    }
+    return invoke_with_last_first(
+        [&](auto &&last, auto &&... inputs) {
+          return SkydownSplOutput(as_outputter(out,
+                                               [&](auto &&out, auto &&item) {
+                                                 return out(std::forward<
+                                                                decltype(inputs)>(inputs)...,
+                                                            std::forward<
+                                                                decltype(item)>(
+                                                                item));
+                                               }),
+                                  std::forward<decltype(last)>(last));
+        },
+        std::forward<decltype(inputs)>(inputs)...);
   });
 }
 
