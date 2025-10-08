@@ -5,35 +5,6 @@
 #include <map>
 
 namespace spl {
-// Forward declarations
-template<typename StageProperties, typename InputTypes, typename F>
-struct for_each_impl;
-
-// Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes, typename F>
-struct for_each_impl<StageProperties, types<InputTypes...>, F>
-    : stage_impl<for_each_impl<StageProperties, types<InputTypes...>, F>> {
-  using base = typename for_each_impl::base;
-  using output_types = types<std::monostate &&>;
-
-  F f;
-
-  constexpr void process_incremental(InputTypes... inputs) {
-    f(std::forward<InputTypes>(inputs)...);
-  }
-
-  constexpr decltype(auto) finish() {
-    return this->next.process_complete(std::monostate{});
-  }
-};
-
-template<typename F>
-constexpr auto for_each(F f) {
-  return stage<for_each_impl,
-               processing_style::incremental,
-               processing_style::complete,
-               F>(std::move(f));
-}
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename T, typename F>
@@ -110,6 +81,13 @@ constexpr auto accumulate(F f) {
                              });
 }
 
+
+template<typename F>
+constexpr auto for_each(F f) {
+  return accumulate_in_place(std::monostate(),[f=std::move(f)](auto&, auto&&... ts){
+    std::invoke(f,std::forward<decltype(ts)>(ts)...);
+  });
+}
 constexpr auto sum() {
   return accumulate(std::plus<>{});
 }

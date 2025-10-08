@@ -623,6 +623,99 @@ TEST(SplTest, TeeMultiArgument) {
   EXPECT_EQ(std::get<1>(result), 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
 }
 
+constexpr auto constexpr_for_each_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  int sum = 0;
+  spl::apply(v, spl::for_each([&sum](int x) { sum += x; }));
+  return sum;
+}
+
+TEST(SplTest, ForEach) {
+  static_assert(constexpr_for_each_test() == 15);  // 1+2+3+4+5 = 15
+  EXPECT_EQ(constexpr_for_each_test(), 15);
+}
+
+constexpr auto constexpr_for_each_with_filter_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6};
+  int sum = 0;
+  spl::apply(v,
+             spl::filter([](int x) { return x % 2 == 0; }),
+             spl::for_each([&sum](int x) { sum += x; }));
+  return sum;
+}
+
+TEST(SplTest, ForEachWithFilter) {
+  static_assert(constexpr_for_each_with_filter_test() == 12);  // 2+4+6 = 12
+  EXPECT_EQ(constexpr_for_each_with_filter_test(), 12);
+}
+
+constexpr auto constexpr_for_each_with_transform_test() {
+  constexpr std::array v{1, 2, 3};
+  int product = 1;
+  spl::apply(v,
+             spl::transform([](int x) { return x * 2; }),
+             spl::for_each([&product](int x) { product *= x; }));
+  return product;
+}
+
+TEST(SplTest, ForEachWithTransform) {
+  static_assert(constexpr_for_each_with_transform_test() == 48);  // 2*4*6 = 48
+  EXPECT_EQ(constexpr_for_each_with_transform_test(), 48);
+}
+
+TEST(SplTest, ForEachWithVector) {
+  std::vector<int> results;
+  spl::apply(std::vector{10, 20, 30},
+             spl::for_each([&results](int x) { results.push_back(x * 2); }));
+
+  EXPECT_THAT(results, ElementsAre(20, 40, 60));
+}
+
+constexpr auto constexpr_for_each_multi_arg_test() {
+  constexpr std::array<std::pair<int, int>, 3> v{{
+      {1, 2},
+      {3, 4},
+      {5, 6}
+  }};
+
+  int sum = 0;
+  spl::apply(v,
+             spl::expand_tuple(),
+             spl::for_each([&sum](int a, int b) { sum += a + b; }));
+  return sum;
+}
+
+TEST(SplTest, ForEachMultiArgument) {
+  static_assert(constexpr_for_each_multi_arg_test() == 21);  // (1+2)+(3+4)+(5+6) = 3+7+11 = 21
+  EXPECT_EQ(constexpr_for_each_multi_arg_test(), 21);
+
+  std::vector<int> results;
+  std::array<std::pair<int, int>, 2> v{{
+      {10, 20},
+      {30, 40}
+  }};
+
+  spl::apply(v,
+             spl::expand_tuple(),
+             spl::for_each([&results](int a, int b) { results.push_back(a * b); }));
+
+  EXPECT_THAT(results, ElementsAre(200, 1200));
+}
+
+constexpr auto constexpr_for_each_count_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  int count = 0;
+  spl::apply(v,
+             spl::filter([](int x) { return x > 2; }),
+             spl::for_each([&count](int) { ++count; }));
+  return count;
+}
+
+TEST(SplTest, ForEachCount) {
+  static_assert(constexpr_for_each_count_test() == 3);  // 3, 4, 5 pass the filter
+  EXPECT_EQ(constexpr_for_each_count_test(), 3);
+}
+
 
 }
 
