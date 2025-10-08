@@ -350,7 +350,11 @@ namespace detail {
 struct end_stage {
   template<typename T>
   constexpr decltype(auto) process_complete(T &&t) {
-    return std::forward<T>(t);
+    if constexpr (std::is_lvalue_reference_v<decltype(t)>){
+      return t;
+    } else{
+      return T{std::move(t)};
+    }
   }
 
   constexpr bool done() const { return false; }

@@ -534,6 +534,19 @@ TEST(SplTest, PythagoreanTriples){
 
 }
 
+TEST(SplTest, Tee) {
+  constexpr auto result = spl::apply(
+      std::array{1, 2, 3, 4, 5},
+      spl::tee(
+          spl::sum(),
+          spl::compose(spl::transform([](int x) { return x * x; }), spl::sum())
+      )
+  );
+
+  EXPECT_EQ(std::get<0>(result), 15);  // sum
+  EXPECT_EQ(std::get<1>(result), 55);  // sum of squares
+}
+
 
 }
 

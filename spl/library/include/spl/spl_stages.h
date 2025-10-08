@@ -415,6 +415,64 @@ constexpr auto group_by(SelectorF selector_f, Stages... stages) {
                MapType>(std::move(selector_f), compose(std::move(stages)...));
 }
 
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename... Composed>
+struct tee_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename... Composed>
+struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
+    : stage_impl<tee_impl<StageProperties, types<InputTypes...>, Composed...>> {
+  using base = typename tee_impl::base;
+
+  template<typename C>
+  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
+                                                    processing_style::incremental>(
+      std::declval<C>()));
+
+  using output_types = types<std::tuple<std::remove_cvref_t<decltype(std::declval<
+      pipeline_type<Composed>>().finish())>...> &&>;
+
+  std::tuple<pipeline_type<Composed>...> pipelines;
+
+  constexpr tee_impl(typename base::next_type&& next, Composed... composed_stages)
+      : base(std::move(next)),
+        pipelines(make_pipeline_helper(composed_stages)...) {
+  }
+
+  constexpr void process_incremental(InputTypes... inputs) {
+    std::apply([&](auto&... pipes) {
+      (pipes.process_incremental(inputs...), ...);
+    }, pipelines);
+  }
+
+  constexpr decltype(auto) finish() {
+    return this->next.process_complete(std::apply([](auto&&... pipes)  {
+      return std::make_tuple(pipes.finish()...);
+    }, pipelines));
+  }
+
+private:
+  template<typename C>
+  static constexpr auto make_pipeline_helper(C c) {
+    return spl::make_pipeline<types<InputTypes...>, processing_style::incremental>(
+        c);
+  }
+};
+
+template<typename... Stages>
+constexpr auto tee_helper(Stages... stages) {
+  return stage<tee_impl,
+               processing_style::incremental,
+               processing_style::complete,
+               std::remove_cvref_t<Stages>...>(std::move(stages)...);
+}
+
+template<typename... Stages>
+constexpr auto tee(Stages&&... stages) {
+  return tee_helper((std::forward<Stages>(stages))...);
+}
+
 }
 
 #endif //SKYDOWN_SPL_STAGES_H_
