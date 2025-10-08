@@ -442,7 +442,7 @@ struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
 
   constexpr void process_incremental(InputTypes... inputs) {
     std::apply([&](auto&... pipes) {
-      (pipes.process_incremental(inputs...), ...);
+      (pipes.process_incremental(static_cast<InputTypes>(inputs)...), ...);
     }, pipelines);
   }
 

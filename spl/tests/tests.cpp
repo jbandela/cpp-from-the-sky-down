@@ -543,8 +543,84 @@ TEST(SplTest, Tee) {
       )
   );
 
+  static_assert(std::get<0>(result) == 15);  // sum
+  static_assert(std::get<1>(result) == 55);  // sum of squares
   EXPECT_EQ(std::get<0>(result), 15);  // sum
   EXPECT_EQ(std::get<1>(result), 55);  // sum of squares
+}
+
+TEST(SplTest, TeeConstexpr) {
+  constexpr auto result = []() {
+    return spl::apply(
+        std::array{2, 4, 6, 8},
+        spl::tee(
+            spl::sum(),
+            spl::compose(spl::transform([](int x) { return x / 2; }), spl::sum())
+        )
+    );
+  }();
+
+  static_assert(std::get<0>(result) == 20);  // sum
+  static_assert(std::get<1>(result) == 10);  // sum of halves
+}
+
+TEST(SplTest, TeeSinglePipeline) {
+  auto result = spl::apply(
+      std::vector{1, 2, 3},
+      spl::tee(spl::sum())
+  );
+
+  EXPECT_EQ(std::get<0>(result), 6);
+}
+
+TEST(SplTest, TeeThreePipelines) {
+  constexpr auto result = spl::apply(
+      std::array{2, 3, 4, 5},
+      spl::tee(
+          spl::sum(),
+          spl::compose(spl::transform([](int x) { return x * x; }), spl::sum()),
+          spl::compose(spl::transform([](int x) { return x * 2; }), spl::sum())
+      )
+  );
+
+  static_assert(std::get<0>(result) == 14);   // sum: 2+3+4+5
+  static_assert(std::get<1>(result) == 54);   // sum of squares: 4+9+16+25
+  static_assert(std::get<2>(result) == 28);   // sum of doubles: 4+6+8+10
+  EXPECT_EQ(std::get<0>(result), 14);   // sum: 2+3+4+5
+  EXPECT_EQ(std::get<1>(result), 54);   // sum of squares: 4+9+16+25
+  EXPECT_EQ(std::get<2>(result), 28);   // sum of doubles: 4+6+8+10
+}
+
+TEST(SplTest, TeeWithVector) {
+  auto result = spl::apply(
+      std::vector{10, 20, 30},
+      spl::tee(
+          spl::sum(),
+          spl::to_vector(),
+          spl::compose(spl::filter([](int x) { return x > 15; }), spl::sum())
+      )
+  );
+
+  EXPECT_EQ(std::get<0>(result), 60);
+  EXPECT_EQ(std::get<1>(result), (std::vector{10, 20, 30}));
+  EXPECT_EQ(std::get<2>(result), 50);  // 20 + 30
+}
+
+TEST(SplTest, TeeMultiArgument) {
+  constexpr auto result = spl::apply(
+      std::array{1, 2, 3},
+      spl::zip_result([](int x) { return x * 10; }),
+      spl::tee(
+          spl::compose(spl::transform([](int x, int y) { return x + y; }), spl::sum()),
+          spl::compose(spl::transform([](int x, int y) { return x * y; }), spl::sum())
+      )
+  );
+
+  static_assert(std::get<0>(result) == 66);   // (1+10) + (2+20) + (3+30) = 11+22+33
+  static_assert(std::get<1>(result) == 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
+
+  EXPECT_EQ(std::get<0>(result), 66);   // (1+10) + (2+20) + (3+30) = 11+22+33
+  EXPECT_EQ(std::get<1>(result), 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
 }
 
 
