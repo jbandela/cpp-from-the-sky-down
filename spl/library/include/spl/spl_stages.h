@@ -234,10 +234,10 @@ constexpr auto SkydownSplOutput(Output &&output, T &&is) {
     return output(size_t(is.current));
   } else {
     for (; is.current < is.end; ++is.current) {
-      if (!output) return true;
+      if (!output) return false;
       output(size_t(is.current));
     }
-    return false;
+    return true;
   }
 }
 
@@ -321,7 +321,7 @@ constexpr auto flatten() {
     if constexpr (calculate_type_v<Out>) {
       return invoke();
     } else {
-      return !invoke();
+      return invoke();
     }
   });
 }

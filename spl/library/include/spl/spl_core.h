@@ -158,13 +158,13 @@ constexpr auto SkydownSplOutput(Output &&output,
 
   } else {
     for (auto &&v : std::forward<R>(r)) {
-      if (!output) return true;
+      if (!output) return false;
       output(
           move_if_movable_range<std::remove_cvref_t<
               R>>(std::forward<decltype(v)>(
               v)));
     }
-    return false;
+    return true;
   }
 }
 
