@@ -35,24 +35,6 @@ constexpr auto for_each(F f) {
                F>(std::move(f));
 }
 
-template<template<typename...> typename T>
-struct template_to_typename {
-};
-
-template<typename T, typename>
-struct apply_input_to_typename {
-  using type = T;
-};
-
-template<template<typename...> typename T, typename Input>
-struct apply_input_to_typename<template_to_typename<T>, Input> {
-  using type = T<Input>;
-};
-
-template<typename T, typename Input>
-using apply_input_to_typename_t = typename apply_input_to_typename<T,
-                                                                   Input>::type;
-
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename T, typename F>
 struct accumulate_in_place_impl;
@@ -65,10 +47,7 @@ struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
                                           T,
                                           F>> {
   using base = typename accumulate_in_place_impl::base;
-  // For single-argument case, use the first input type
-  using first_input = std::tuple_element_t<0, std::tuple<InputTypes...>>;
-  using accumulated_type = std::remove_cvref_t<apply_input_to_typename_t<T,
-                                                                         first_input>>;
+  using accumulated_type = std::remove_cvref_t<first_type_t<std::invoke_result_t<T,types<InputTypes...>>>>;
   static_assert(!std::is_same_v<accumulated_type, void>);
   using output_types = types<accumulated_type &&>;
   [[no_unique_address]] F f{};
@@ -86,20 +65,22 @@ struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
 
 template<typename T, typename F>
 constexpr auto accumulate_in_place(T t, F f) {
+  constexpr auto type_calculator = [](auto){return types<T>();};
   return stage<accumulate_in_place_impl,
                processing_style::incremental,
                processing_style::complete,
-               T,
+               decltype(type_calculator),
                F>(
       std::move(f), std::move(t));
 }
 
-template<template<typename...> typename T, typename F>
-constexpr auto accumulate_in_place(F f) {
+template<typename T, typename F>
+requires(std::is_invocable_v<T,types<int&&>>)
+constexpr auto accumulate_in_place(T t, F f) {
   return stage<accumulate_in_place_impl,
                processing_style::incremental,
                processing_style::complete,
-               template_to_typename<T>,
+               T,
                F>(std::move(f));
 }
 
@@ -110,22 +91,27 @@ constexpr auto accumulate(T t, F f) {
                                                 auto &&v) {
                                accumulated =
                                    std::invoke(f,
-                                               std::forward<decltype(v)>(
+                                               accumulated, std::forward<decltype(v)>(
                                                    v));
                              });
 }
 
-template<template<typename> typename T, typename F>
+template<typename F>
 constexpr auto accumulate(F f) {
-  return accumulate_in_place<T>([f = std::move(f)](auto &accumulated,
-                                                   auto &&v) {
-    accumulated = std::invoke(f, accumulated,
-                              std::forward<decltype(v)>(v));
-  });
+  return accumulate_in_place([]<typename... Types>(types<Types...>){
+    static_assert(sizeof...(Types) == 1, "Accumulate needs to only have one input");
+    return types<std::remove_cvref_t<Types>...>();},
+                             [f = std::move(f)](auto &accumulated,
+                                                auto &&v) {
+                               accumulated =
+                                   std::invoke(f,
+                                               accumulated, std::forward<decltype(v)>(
+                                                   v));
+                             });
 }
 
 constexpr auto sum() {
-  return accumulate<std::type_identity_t>(std::plus<>{});
+  return accumulate(std::plus<>{});
 }
 
 // Forward declaration
@@ -329,14 +315,19 @@ constexpr auto flatten() {
   });
 }
 
-template<typename T>
-using vector_impl = std::vector<std::remove_cvref_t<T>>;
-
-constexpr auto to_vector() {
-
-  return accumulate_in_place<vector_impl>([](auto &c, auto &&v) {
+template<template<typename...> typename C>
+constexpr auto push_back_to(){
+  return accumulate_in_place([]<typename... Inputs>(types<Inputs...>){
+    static_assert(sizeof...(Inputs) == 1,"push_back_to can only take 1 input argument");
+    return types<C<std::remove_cvref_t<first_type_t<types<Inputs...>>>>>();
+  },[](auto &c, auto &&v) {
     c.push_back(std::forward<decltype(v)>(v));
   });
+
+}
+
+constexpr auto to_vector() {
+  return push_back_to<std::vector>();
 }
 
 namespace detail {

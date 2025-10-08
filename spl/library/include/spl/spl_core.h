@@ -12,8 +12,6 @@ namespace spl {
 // Template to hold multiple types - all must be reference types
 template<typename... Ts>
 struct types {
-  static_assert((std::is_reference_v<Ts> && ...),
-                "All types in types<...> must be reference types");
 };
 
 template<typename T>
@@ -21,6 +19,17 @@ struct is_types:std::false_type {};
 
 template<typename... Ts>
 struct is_types<types<Ts...>>:std::true_type {} ;
+
+template<typename Types>
+struct first_type;
+
+template<typename First, typename... Types>
+struct first_type<types<First, Types...>>{
+  using type = First;
+};
+
+template<typename Types>
+using first_type_t = typename first_type<Types>::type;
 
 
 enum class processing_style {
