@@ -212,6 +212,12 @@ struct stage_impl<Derived<StageProperties,
     return next.done();
   }
 
+  constexpr bool done() const requires(complete_input<
+      child_type>) {
+    return false;
+  }
+
+
   constexpr void
   process_incremental(InputTypes... inputs)requires(incremental_input<
       child_type>) {

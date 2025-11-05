@@ -716,6 +716,72 @@ TEST(SplTest, ForEachCount) {
   EXPECT_EQ(constexpr_for_each_count_test(), 3);
 }
 
+constexpr auto constexpr_transform_complete_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                    spl::sum(),
+                    spl::transform_complete([](int x) { return x * 2; }));
+}
+
+TEST(SplTest, TransformComplete) {
+  static_assert(constexpr_transform_complete_test() == 30);  // (1+2+3+4+5)*2 = 15*2 = 30
+  EXPECT_EQ(constexpr_transform_complete_test(), 30);
+}
+
+constexpr auto constexpr_transform_complete_multiple_test() {
+  constexpr std::array v{2, 4, 6};
+  return spl::apply(v,
+                    spl::tee(
+                        spl::sum(),
+                        spl::compose(spl::transform([](int x) { return x * x; }), spl::sum())
+                    ),
+                    spl::transform_complete([](auto tuple) {
+                      return std::get<0>(tuple) + std::get<1>(tuple);
+                    }));
+}
+
+TEST(SplTest, TransformCompleteMultiple) {
+  static_assert(constexpr_transform_complete_multiple_test() == 68);  // sum=12, sum_squares=56, total=68
+  EXPECT_EQ(constexpr_transform_complete_multiple_test(), 68);
+}
+
+constexpr auto constexpr_transform_complete_cps_test() {
+  constexpr std::array v{10, 20, 30};
+  return spl::apply(v,
+                    spl::sum(),
+                    spl::transform_complete_cps([](auto &&out, int x) {
+                      return out(x / 10, x % 10);
+                    }),
+                    spl::transform_complete([](int a, int b) { return a + b; }));
+}
+
+TEST(SplTest, TransformCompleteCps) {
+  static_assert(constexpr_transform_complete_cps_test() == 6);  // 60/10 + 60%10 = 6 + 0 = 6
+  EXPECT_EQ(constexpr_transform_complete_cps_test(), 6);
+}
+
+TEST(SplTest, TransformCompleteWithVector) {
+  auto result = spl::apply(std::vector{1, 2, 3, 4},
+                          spl::sum(),
+                          spl::transform_complete([](int x) { return x * 3; }));
+
+  EXPECT_EQ(result, 30);  // (1+2+3+4)*3 = 10*3 = 30
+}
+
+constexpr auto constexpr_transform_complete_chain_test() {
+  constexpr std::array v{5, 10, 15};
+  return spl::apply(v,
+                    spl::sum(),
+                    spl::transform_complete([](int x) { return x * 2; }),
+                    spl::transform_complete([](int x) { return x + 10; }),
+                    spl::transform_complete([](int x) { return x / 5; }));
+}
+
+TEST(SplTest, TransformCompleteChain) {
+  static_assert(constexpr_transform_complete_chain_test() == 14);  // ((30*2)+10)/5 = 70/5 = 14
+  EXPECT_EQ(constexpr_transform_complete_chain_test(), 14);
+}
+
 
 }
 
