@@ -782,6 +782,97 @@ TEST(SplTest, TransformCompleteChain) {
   EXPECT_EQ(constexpr_transform_complete_chain_test(), 14);
 }
 
+constexpr auto constexpr_accumulate_in_place_with_type_calculator_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                    spl::accumulate_in_place_with_type_calculator(
+                        []<typename... Types>(spl::types<Types...>) {
+                          return spl::types<int>();
+                        },
+                        [](int& acc, int x) { acc += x * x; }));
+}
+
+TEST(SplTest, AccumulateInPlaceWithTypeCalculator) {
+  static_assert(constexpr_accumulate_in_place_with_type_calculator_test() == 55);  // 1+4+9+16+25 = 55
+  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_test(), 55);
+}
+
+constexpr auto constexpr_accumulate_in_place_with_type_calculator_product_test() {
+  constexpr std::array v{2, 3, 4};
+  return spl::apply(v,
+                    spl::accumulate_in_place_with_type_calculator(
+                        []<typename... Types>(spl::types<Types...>) {
+                          return spl::types<int>();
+                        },
+                        [](int& acc, int x) {
+                          if (acc == 0) acc = 1;
+                          acc *= x;
+                        }));
+}
+
+TEST(SplTest, AccumulateInPlaceWithTypeCalculatorProduct) {
+  static_assert(constexpr_accumulate_in_place_with_type_calculator_product_test() == 24);  // 2*3*4 = 24
+  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_product_test(), 24);
+}
+
+constexpr auto constexpr_accumulate_in_place_with_type_calculator_pair_test() {
+  constexpr std::array<std::pair<int, int>, 3> v{{
+      {1, 10},
+      {2, 20},
+      {3, 30}
+  }};
+
+  struct Acc {
+    int sum_first = 0;
+    int sum_second = 0;
+  };
+
+  auto result = spl::apply(v,
+                          spl::expand_tuple(),
+                          spl::accumulate_in_place_with_type_calculator(
+                              []<typename... Types>(spl::types<Types...>) {
+                                return spl::types<Acc>();
+                              },
+                              [](Acc& acc, int a, int b) {
+                                acc.sum_first += a;
+                                acc.sum_second += b;
+                              }));
+  return result.sum_first + result.sum_second;
+}
+
+TEST(SplTest, AccumulateInPlaceWithTypeCalculatorPair) {
+  static_assert(constexpr_accumulate_in_place_with_type_calculator_pair_test() == 66);  // (1+2+3)+(10+20+30) = 6+60 = 66
+  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_pair_test(), 66);
+}
+
+TEST(SplTest, AccumulateInPlaceWithTypeCalculatorVector) {
+  std::vector<int> v{5, 10, 15, 20};
+  auto result = spl::apply(v,
+                          spl::accumulate_in_place_with_type_calculator(
+                              []<typename... Types>(spl::types<Types...>) {
+                                return spl::types<int>();
+                              },
+                              [](int& acc, int x) { acc += x; }));
+
+  EXPECT_EQ(result, 50);  // 5+10+15+20 = 50
+}
+
+constexpr auto constexpr_accumulate_in_place_with_type_calculator_with_filter_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6, 7, 8};
+  return spl::apply(v,
+                    spl::filter([](int x) { return x % 2 == 0; }),
+                    spl::accumulate_in_place_with_type_calculator(
+                        []<typename... Types>(spl::types<Types...>) {
+                          return spl::types<int>();
+                        },
+                        [](int& acc, int x) { acc += x; }));
+}
+
+TEST(SplTest, AccumulateInPlaceWithTypeCalculatorWithFilter) {
+  static_assert(constexpr_accumulate_in_place_with_type_calculator_with_filter_test() == 20);  // 2+4+6+8 = 20
+  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_with_filter_test(), 20);
+}
+
 
 }
 

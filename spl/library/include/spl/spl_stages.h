@@ -45,14 +45,19 @@ constexpr auto accumulate_in_place(T t, F f) {
       std::move(f), std::move(t));
 }
 
-template<typename T, typename F>
-requires(std::is_invocable_v<T,types<int&&>>)
-constexpr auto accumulate_in_place(T t, F f) {
+template<typename TypeCalculator, typename F>
+constexpr auto accumulate_in_place_with_type_calculator(TypeCalculator t, F f) {
   return stage<accumulate_in_place_impl,
                processing_style::incremental,
                processing_style::complete,
-               T,
+               TypeCalculator,
                F>(std::move(f));
+}
+
+template<typename T, typename F>
+requires(std::is_invocable_v<T,types<int&&>>)
+constexpr auto accumulate_in_place(T t, F f) {
+  return accumulate_in_place_with_type_calculator(std::move(t), std::move(f));
 }
 
 template<typename T, typename F>
