@@ -18,7 +18,9 @@ struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
                                           T,
                                           F>> {
   using base = typename accumulate_in_place_impl::base;
-  using accumulated_type = std::remove_cvref_t<first_type_t<std::invoke_result_t<T,types<InputTypes...>>>>;
+  using accumulated_type = std::remove_cvref_t<first_type_t<std::invoke_result_t<
+      T,
+      types<InputTypes...>>>>;
   static_assert(!std::is_same_v<accumulated_type, void>);
   using output_types = types<accumulated_type &&>;
   [[no_unique_address]] F f{};
@@ -36,7 +38,7 @@ struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
 
 template<typename T, typename F>
 constexpr auto accumulate_in_place(T t, F f) {
-  constexpr auto type_calculator = [](auto){return types<T>();};
+  constexpr auto type_calculator = [](auto) { return types<T>(); };
   return stage<accumulate_in_place_impl,
                processing_style::incremental,
                processing_style::complete,
@@ -55,7 +57,7 @@ constexpr auto accumulate_in_place_with_type_calculator(TypeCalculator t, F f) {
 }
 
 template<typename T, typename F>
-requires(std::is_invocable_v<T,types<int&&>>)
+requires(std::is_invocable_v<T, types<int &&>>)
 constexpr auto accumulate_in_place(T t, F f) {
   return accumulate_in_place_with_type_calculator(std::move(t), std::move(f));
 }
@@ -67,31 +69,36 @@ constexpr auto accumulate(T t, F f) {
                                                 auto &&v) {
                                accumulated =
                                    std::invoke(f,
-                                               accumulated, std::forward<decltype(v)>(
+                                               accumulated,
+                                               std::forward<decltype(v)>(
                                                    v));
                              });
 }
 
 template<typename F>
 constexpr auto accumulate(F f) {
-  return accumulate_in_place([]<typename... Types>(types<Types...>){
-    static_assert(sizeof...(Types) == 1, "Accumulate needs to only have one input");
-    return types<std::remove_cvref_t<Types>...>();},
+  return accumulate_in_place([]<typename... Types>(types<Types...>) {
+                               static_assert(sizeof...(Types) == 1,
+                                             "Accumulate needs to only have one input");
+                               return types<std::remove_cvref_t<Types>...>();
+                             },
                              [f = std::move(f)](auto &accumulated,
                                                 auto &&v) {
                                accumulated =
                                    std::invoke(f,
-                                               accumulated, std::forward<decltype(v)>(
+                                               accumulated,
+                                               std::forward<decltype(v)>(
                                                    v));
                              });
 }
 
-
 template<typename F>
 constexpr auto for_each(F f) {
-  return accumulate_in_place(std::monostate(),[f=std::move(f)](auto&, auto&&... ts){
-    std::invoke(f,std::forward<decltype(ts)>(ts)...);
-  });
+  return accumulate_in_place(std::monostate(),
+                             [f = std::move(f)](auto &, auto &&... ts) {
+                               std::invoke(f,
+                                           std::forward<decltype(ts)>(ts)...);
+                             });
 }
 constexpr auto sum() {
   return accumulate(std::plus<>{});
@@ -253,7 +260,9 @@ struct transform_complete_cps_impl;
 // Partial specialization to extract types from types<...>
 template<typename StageProperties, typename... InputTypes, typename F>
 struct transform_complete_cps_impl<StageProperties, types<InputTypes...>, F>
-    : stage_impl<transform_complete_cps_impl<StageProperties, types<InputTypes...>, F>> {
+    : stage_impl<transform_complete_cps_impl<StageProperties,
+                                             types<InputTypes...>,
+                                             F>> {
   using base = typename transform_complete_cps_impl::base;
 
   using output_types = decltype(std::invoke(
@@ -267,10 +276,11 @@ struct transform_complete_cps_impl<StageProperties, types<InputTypes...>, F>
 
   constexpr decltype(auto) process_complete(InputTypes... inputs) {
     return std::invoke(f,
-                      [this](auto&&... outputs) -> decltype(auto) {
-                        return this->next.process_complete(std::forward<decltype(outputs)>(outputs)...);
-                      },
-                      std::forward<InputTypes>(inputs)...);
+                       [this](auto &&... outputs) -> decltype(auto) {
+                         return this->next.process_complete(std::forward<
+                             decltype(outputs)>(outputs)...);
+                       },
+                       std::forward<InputTypes>(inputs)...);
   }
 };
 
@@ -284,7 +294,8 @@ constexpr auto transform_complete_cps(F f) {
 
 template<typename F>
 constexpr auto transform_complete(F f) {
-  return transform_complete_cps([f = std::move(f)](auto &&out, auto &&... inputs) {
+  return transform_complete_cps([f = std::move(f)](auto &&out,
+                                                   auto &&... inputs) {
     return out(std::invoke(f, std::forward<decltype(inputs)>(inputs)...));
   });
 }
@@ -342,11 +353,12 @@ constexpr auto flatten() {
 }
 
 template<template<typename...> typename C>
-constexpr auto push_back_to(){
-  return accumulate_in_place([]<typename... Inputs>(types<Inputs...>){
-    static_assert(sizeof...(Inputs) == 1,"push_back_to can only take 1 input argument");
+constexpr auto push_back_to() {
+  return accumulate_in_place([]<typename... Inputs>(types<Inputs...>) {
+    static_assert(sizeof...(Inputs) == 1,
+                  "push_back_to can only take 1 input argument");
     return types<C<std::remove_cvref_t<first_type_t<types<Inputs...>>>>>();
-  },[](auto &c, auto &&v) {
+  }, [](auto &c, auto &&v) {
     c.push_back(std::forward<decltype(v)>(v));
   });
 
@@ -354,6 +366,17 @@ constexpr auto push_back_to(){
 
 constexpr auto to_vector() {
   return push_back_to<std::vector>();
+}
+
+template<template<typename, typename> typename MapType>
+constexpr auto to_map() {
+  return accumulate_in_place_with_type_calculator([]<typename... Inputs>(types<
+      Inputs...>) {
+    static_assert(sizeof...(Inputs) == 2, "to_map needs 2 input arguments");
+    return types<MapType<std::remove_cvref_t<Inputs>...>>();
+  }, [](auto &m, auto &&... args) {
+    m.emplace(std::forward<decltype(args)>(args)...);
+  });
 }
 
 namespace detail {
@@ -452,27 +475,29 @@ struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
 
   std::tuple<pipeline_type<Composed>...> pipelines;
 
-  constexpr tee_impl(typename base::next_type&& next, Composed... composed_stages)
+  constexpr tee_impl(typename base::next_type &&next,
+                     Composed... composed_stages)
       : base(std::move(next)),
         pipelines(make_pipeline_helper(composed_stages)...) {
   }
 
   constexpr void process_incremental(InputTypes... inputs) {
-    std::apply([&](auto&... pipes) {
+    std::apply([&](auto &... pipes) {
       (pipes.process_incremental(static_cast<InputTypes>(inputs)...), ...);
     }, pipelines);
   }
 
   constexpr decltype(auto) finish() {
-    return this->next.process_complete(std::apply([](auto&&... pipes)  {
+    return this->next.process_complete(std::apply([](auto &&... pipes) {
       return std::make_tuple(pipes.finish()...);
     }, pipelines));
   }
 
-private:
+ private:
   template<typename C>
   static constexpr auto make_pipeline_helper(C c) {
-    return spl::make_pipeline<types<InputTypes...>, processing_style::incremental>(
+    return spl::make_pipeline<types<InputTypes...>,
+                              processing_style::incremental>(
         c);
   }
 };
@@ -486,7 +511,7 @@ constexpr auto tee_helper(Stages... stages) {
 }
 
 template<typename... Stages>
-constexpr auto tee(Stages&&... stages) {
+constexpr auto tee(Stages &&... stages) {
   return tee_helper((std::forward<Stages>(stages))...);
 }
 

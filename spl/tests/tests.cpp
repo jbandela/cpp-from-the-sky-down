@@ -13,31 +13,47 @@ struct constexpr_map {
   std::size_t count = 0;
 
   struct iterator {
-    std::optional<std::pair<K, V>>* ptr;
+    std::optional<std::pair<K, V>> *ptr;
 
-    constexpr std::pair<K, V>& operator*() const { return **ptr; }
-    constexpr std::pair<K, V>* operator->() const { return &**ptr; }
-    constexpr iterator& operator++() { ++ptr; return *this; }
-    constexpr bool operator==(const iterator& other) const { return ptr == other.ptr; }
-    constexpr bool operator!=(const iterator& other) const { return ptr != other.ptr; }
+    constexpr std::pair<K, V> &operator*() const { return **ptr; }
+    constexpr std::pair<K, V> *operator->() const { return &**ptr; }
+    constexpr iterator &operator++() {
+      ++ptr;
+      return *this;
+    }
+    constexpr bool operator==(const iterator &other) const {
+      return ptr == other.ptr;
+    }
+    constexpr bool operator!=(const iterator &other) const {
+      return ptr != other.ptr;
+    }
   };
 
   struct const_iterator {
-    const std::optional<std::pair<K, V>>* ptr;
+    const std::optional<std::pair<K, V>> *ptr;
 
-    constexpr const std::pair<K, V>& operator*() const { return **ptr; }
-    constexpr const std::pair<K, V>* operator->() const { return &**ptr; }
-    constexpr const_iterator& operator++() { ++ptr; return *this; }
-    constexpr bool operator==(const const_iterator& other) const { return ptr == other.ptr; }
-    constexpr bool operator!=(const const_iterator& other) const { return ptr != other.ptr; }
+    constexpr const std::pair<K, V> &operator*() const { return **ptr; }
+    constexpr const std::pair<K, V> *operator->() const { return &**ptr; }
+    constexpr const_iterator &operator++() {
+      ++ptr;
+      return *this;
+    }
+    constexpr bool operator==(const const_iterator &other) const {
+      return ptr == other.ptr;
+    }
+    constexpr bool operator!=(const const_iterator &other) const {
+      return ptr != other.ptr;
+    }
   };
 
   constexpr iterator begin() { return iterator{data.data()}; }
   constexpr iterator end() { return iterator{data.data() + count}; }
   constexpr const_iterator begin() const { return const_iterator{data.data()}; }
-  constexpr const_iterator end() const { return const_iterator{data.data() + count}; }
+  constexpr const_iterator end() const {
+    return const_iterator{data.data() + count};
+  }
 
-  constexpr iterator find(const K& key) {
+  constexpr iterator find(const K &key) {
     for (std::size_t i = 0; i < count; ++i) {
       if (data[i]->first == key) {
         return iterator{data.data() + i};
@@ -46,7 +62,7 @@ struct constexpr_map {
     return end();
   }
 
-  constexpr const_iterator find(const K& key) const {
+  constexpr const_iterator find(const K &key) const {
     for (std::size_t i = 0; i < count; ++i) {
       if (data[i]->first == key) {
         return const_iterator{data.data() + i};
@@ -56,7 +72,7 @@ struct constexpr_map {
   }
 
   template<typename... Args>
-  constexpr std::pair<iterator, bool> emplace(K key, Args&&... args) {
+  constexpr std::pair<iterator, bool> emplace(K key, Args &&... args) {
     auto it = find(key);
     if (it != end()) {
       return {it, false};
@@ -136,12 +152,13 @@ constexpr auto constexpr_group_by_test() {
                     spl::group_by<constexpr_map_factory<>>(&pair::first,
                                                            spl::transform(&pair::second),
                                                            spl::sum()),
-                    spl::transform([](auto&& p) { return p.second; }),
+                    spl::transform([](auto &&p) { return p.second; }),
                     spl::sum());
 }
 
 TEST(SplTest, GroupBy) {
-  static_assert(constexpr_group_by_test() == 7); // group 1: 2+1=3, group 2: 4, sum: 3+4=7
+  static_assert(
+      constexpr_group_by_test() == 7); // group 1: 2+1=3, group 2: 4, sum: 3+4=7
   EXPECT_THAT(constexpr_group_by_test(), 7);
 
   using pair = std::pair<std::string, int>;
@@ -162,8 +179,6 @@ constexpr auto constexpr_iota_test() {
   return spl::apply(spl::iota(0, 10), spl::sum());
 
 }
-
-
 
 TEST(SplTest, Iota) {
   auto result = constexpr_iota_test();
@@ -194,7 +209,6 @@ TEST(SplTest, UnboundedIota) {
   static_assert(constexpr_unbounded_iota_test() == 18); // 5 + 6 + 7 = 18
   EXPECT_THAT(result, 18);
 }
-
 
 constexpr auto constexpr_flatten_test() {
   constexpr std::array<std::array<int, 3>, 2> v{{{1, 2, 3}, {4, 5, 6}}};
@@ -229,7 +243,8 @@ constexpr auto constexpr_flatten_with_transform_test() {
 }
 
 TEST(SplTest, FlattenWithTransform) {
-  static_assert(constexpr_flatten_with_transform_test() == 42); // (1+2+3+4+5+6)*2 = 21*2 = 42
+  static_assert(constexpr_flatten_with_transform_test()
+                    == 42); // (1+2+3+4+5+6)*2 = 21*2 = 42
   EXPECT_THAT(constexpr_flatten_with_transform_test(), 42);
 
   constexpr std::array<std::array<int, 2>, 3> v{{{1, 2}, {3, 4}, {5, 6}}};
@@ -268,9 +283,11 @@ TEST(SplTest, FlattenWithTake) {
 }
 constexpr auto constexpr_flatten_multiple_args_test() {
   constexpr std::array<std::pair<int, std::array<int, 3>>, 2> v{{
-      {10, {1, 2, 3}},
-      {20, {4, 5, 6}}
-  }};
+                                                                    {10,
+                                                                     {1, 2, 3}},
+                                                                    {20,
+                                                                     {4, 5, 6}}
+                                                                }};
 
   return spl::apply(v,
                     spl::expand_tuple(),
@@ -281,7 +298,8 @@ constexpr auto constexpr_flatten_multiple_args_test() {
 
 #if 1
 TEST(SplTest, FlattenMultipleArgs) {
-  static_assert(constexpr_flatten_multiple_args_test() == 111); // (10+1)+(10+2)+(10+3)+(20+4)+(20+5)+(20+6) = 11+12+13+24+25+26 = 111
+  static_assert(constexpr_flatten_multiple_args_test()
+                    == 111); // (10+1)+(10+2)+(10+3)+(20+4)+(20+5)+(20+6) = 11+12+13+24+25+26 = 111
   EXPECT_THAT(constexpr_flatten_multiple_args_test(), 111);
 
   // Test that flatten() now works with multiple arguments by flattening the last one
@@ -309,13 +327,16 @@ constexpr auto constexpr_zip_result_test() {
   constexpr std::array v{1, 2, 3, 4};
   return spl::apply(v,
                     spl::zip_result([](int i) { return i * 2; }),
-                    spl::transform([](int orig, int doubled) { return orig + doubled; }),
+                    spl::transform([](int orig, int doubled) {
+                      return orig + doubled;
+                    }),
                     spl::sum());
 }
 
 TEST(SplTest, ZipResult) {
   auto result = constexpr_zip_result_test();
-  static_assert(constexpr_zip_result_test() == 30); // 1+2 + 2+4 + 3+6 + 4+8 = 3+6+9+12 = 30
+  static_assert(constexpr_zip_result_test()
+                    == 30); // 1+2 + 2+4 + 3+6 + 4+8 = 3+6+9+12 = 30
   EXPECT_THAT(result, 30);
 }
 
@@ -323,12 +344,15 @@ constexpr auto constexpr_zip_result_to_vector_test() {
   constexpr std::array v{1, 2, 3};
   return spl::apply(v,
                     spl::zip_result([](int i) { return i * i; }),
-                    spl::transform([](int orig, int squared) { return orig + squared; }),
+                    spl::transform([](int orig, int squared) {
+                      return orig + squared;
+                    }),
                     spl::sum());
 }
 
 TEST(SplTest, ZipResultToVector) {
-  static_assert(constexpr_zip_result_to_vector_test() == 20); // (1+1)+(2+4)+(3+9) = 2+6+12 = 20
+  static_assert(constexpr_zip_result_to_vector_test()
+                    == 20); // (1+1)+(2+4)+(3+9) = 2+6+12 = 20
   EXPECT_THAT(constexpr_zip_result_to_vector_test(), 20);
 
   std::array v{1, 2, 3};
@@ -342,27 +366,30 @@ TEST(SplTest, ZipResultToVector) {
 
 constexpr auto constexpr_zip_result_multiple_args_test() {
   constexpr std::array<std::pair<int, int>, 3> v{{
-      {1, 2},
-      {3, 4},
-      {5, 6}
-  }};
+                                                     {1, 2},
+                                                     {3, 4},
+                                                     {5, 6}
+                                                 }};
 
   return spl::apply(v,
                     spl::expand_tuple(),
                     spl::zip_result([](int a, int b) { return a + b; }),
-                    spl::transform([](int a, int b, int sum) { return a + b + sum; }),
+                    spl::transform([](int a, int b, int sum) {
+                      return a + b + sum;
+                    }),
                     spl::sum());
 }
 
 TEST(SplTest, ZipResultMultipleArgs) {
-  static_assert(constexpr_zip_result_multiple_args_test() == 42); // (1+2+3)+(3+4+7)+(5+6+11) = 6+14+22 = 42
+  static_assert(constexpr_zip_result_multiple_args_test()
+                    == 42); // (1+2+3)+(3+4+7)+(5+6+11) = 6+14+22 = 42
   EXPECT_THAT(constexpr_zip_result_multiple_args_test(), 42);
 
   std::array<std::pair<int, int>, 3> v{{
-      {1, 2},
-      {3, 4},
-      {5, 6}
-  }};
+                                           {1, 2},
+                                           {3, 4},
+                                           {5, 6}
+                                       }};
 
   auto result = spl::apply(v,
                            spl::expand_tuple(),
@@ -371,30 +398,34 @@ TEST(SplTest, ZipResultMultipleArgs) {
                            spl::to_vector());
 
   using triple = std::tuple<int, int, int>;
-  EXPECT_THAT(result, ElementsAre(triple{1, 2, 3}, triple{3, 4, 7}, triple{5, 6, 11}));
+  EXPECT_THAT(result,
+              ElementsAre(triple{1, 2, 3}, triple{3, 4, 7}, triple{5, 6, 11}));
 }
 
 constexpr auto constexpr_swizzle_reorder_test() {
   constexpr std::array<std::tuple<int, int, int>, 2> v{{
-      {1, 2, 3},
-      {4, 5, 6}
-  }};
+                                                           {1, 2, 3},
+                                                           {4, 5, 6}
+                                                       }};
 
   return spl::apply(v,
                     spl::expand_tuple(),
                     spl::swizzle<2, 0, 1>(),
-                    spl::transform([](int a, int b, int c) { return a + b + c; }),
+                    spl::transform([](int a, int b, int c) {
+                      return a + b + c;
+                    }),
                     spl::sum());
 }
 
 TEST(SplTest, SwizzleReorder) {
-  static_assert(constexpr_swizzle_reorder_test() == 21); // (3+1+2)+(6+4+5) = 6+15 = 21
+  static_assert(
+      constexpr_swizzle_reorder_test() == 21); // (3+1+2)+(6+4+5) = 6+15 = 21
   EXPECT_THAT(constexpr_swizzle_reorder_test(), 21);
 
   std::array<std::tuple<int, int, int>, 2> v{{
-      {1, 2, 3},
-      {4, 5, 6}
-  }};
+                                                 {1, 2, 3},
+                                                 {4, 5, 6}
+                                             }};
 
   auto result = spl::apply(v,
                            spl::expand_tuple(),
@@ -408,9 +439,9 @@ TEST(SplTest, SwizzleReorder) {
 
 constexpr auto constexpr_swizzle_filter_test() {
   constexpr std::array<std::tuple<int, int, int>, 2> v{{
-      {1, 2, 3},
-      {4, 5, 6}
-  }};
+                                                           {1, 2, 3},
+                                                           {4, 5, 6}
+                                                       }};
 
   return spl::apply(v,
                     spl::expand_tuple(),
@@ -420,13 +451,14 @@ constexpr auto constexpr_swizzle_filter_test() {
 }
 
 TEST(SplTest, SwizzleFilter) {
-  static_assert(constexpr_swizzle_filter_test() == 14); // (3+1)+(6+4) = 4+10 = 14
+  static_assert(
+      constexpr_swizzle_filter_test() == 14); // (3+1)+(6+4) = 4+10 = 14
   EXPECT_THAT(constexpr_swizzle_filter_test(), 14);
 
   std::array<std::tuple<int, int, int>, 2> v{{
-      {1, 2, 3},
-      {4, 5, 6}
-  }};
+                                                 {1, 2, 3},
+                                                 {4, 5, 6}
+                                             }};
 
   auto result = spl::apply(v,
                            spl::expand_tuple(),
@@ -439,25 +471,28 @@ TEST(SplTest, SwizzleFilter) {
 
 constexpr auto constexpr_swizzle_duplicate_test() {
   constexpr std::array<std::pair<int, int>, 2> v{{
-      {1, 2},
-      {3, 4}
-  }};
+                                                     {1, 2},
+                                                     {3, 4}
+                                                 }};
 
   return spl::apply(v,
                     spl::expand_tuple(),
                     spl::swizzle<0, 0, 1>(),
-                    spl::transform([](int a, int b, int c) { return a + b + c; }),
+                    spl::transform([](int a, int b, int c) {
+                      return a + b + c;
+                    }),
                     spl::sum());
 }
 
 TEST(SplTest, SwizzleDuplicate) {
-  static_assert(constexpr_swizzle_duplicate_test() == 14); // (1+1+2)+(3+3+4) = 4+10 = 14
+  static_assert(
+      constexpr_swizzle_duplicate_test() == 14); // (1+1+2)+(3+3+4) = 4+10 = 14
   EXPECT_THAT(constexpr_swizzle_duplicate_test(), 14);
 
   std::array<std::pair<int, int>, 2> v{{
-      {1, 2},
-      {3, 4}
-  }};
+                                           {1, 2},
+                                           {3, 4}
+                                       }};
 
   auto result = spl::apply(v,
                            spl::expand_tuple(),
@@ -471,10 +506,10 @@ TEST(SplTest, SwizzleDuplicate) {
 
 constexpr auto constexpr_swizzle_single_test() {
   constexpr std::array<std::tuple<int, int, int>, 3> v{{
-      {1, 2, 3},
-      {4, 5, 6},
-      {7, 8, 9}
-  }};
+                                                           {1, 2, 3},
+                                                           {4, 5, 6},
+                                                           {7, 8, 9}
+                                                       }};
 
   return spl::apply(v,
                     spl::expand_tuple(),
@@ -501,8 +536,7 @@ auto PythagoreanTriples() {
 
 }
 
-
-TEST(SplTest, PythagoreanTriples){
+TEST(SplTest, PythagoreanTriples) {
 
   auto zip_flat = [](auto f) {
     return spl::compose(spl::zip_result(f), spl::flatten());
@@ -555,7 +589,8 @@ TEST(SplTest, TeeConstexpr) {
         std::array{2, 4, 6, 8},
         spl::tee(
             spl::sum(),
-            spl::compose(spl::transform([](int x) { return x / 2; }), spl::sum())
+            spl::compose(spl::transform([](int x) { return x / 2; }),
+                         spl::sum())
         )
     );
   }();
@@ -611,13 +646,17 @@ TEST(SplTest, TeeMultiArgument) {
       std::array{1, 2, 3},
       spl::zip_result([](int x) { return x * 10; }),
       spl::tee(
-          spl::compose(spl::transform([](int x, int y) { return x + y; }), spl::sum()),
-          spl::compose(spl::transform([](int x, int y) { return x * y; }), spl::sum())
+          spl::compose(spl::transform([](int x, int y) { return x + y; }),
+                       spl::sum()),
+          spl::compose(spl::transform([](int x, int y) { return x * y; }),
+                       spl::sum())
       )
   );
 
-  static_assert(std::get<0>(result) == 66);   // (1+10) + (2+20) + (3+30) = 11+22+33
-  static_assert(std::get<1>(result) == 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
+  static_assert(
+      std::get<0>(result) == 66);   // (1+10) + (2+20) + (3+30) = 11+22+33
+  static_assert(
+      std::get<1>(result) == 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
 
   EXPECT_EQ(std::get<0>(result), 66);   // (1+10) + (2+20) + (3+30) = 11+22+33
   EXPECT_EQ(std::get<1>(result), 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
@@ -673,10 +712,10 @@ TEST(SplTest, ForEachWithVector) {
 
 constexpr auto constexpr_for_each_multi_arg_test() {
   constexpr std::array<std::pair<int, int>, 3> v{{
-      {1, 2},
-      {3, 4},
-      {5, 6}
-  }};
+                                                     {1, 2},
+                                                     {3, 4},
+                                                     {5, 6}
+                                                 }};
 
   int sum = 0;
   spl::apply(v,
@@ -686,18 +725,21 @@ constexpr auto constexpr_for_each_multi_arg_test() {
 }
 
 TEST(SplTest, ForEachMultiArgument) {
-  static_assert(constexpr_for_each_multi_arg_test() == 21);  // (1+2)+(3+4)+(5+6) = 3+7+11 = 21
+  static_assert(constexpr_for_each_multi_arg_test()
+                    == 21);  // (1+2)+(3+4)+(5+6) = 3+7+11 = 21
   EXPECT_EQ(constexpr_for_each_multi_arg_test(), 21);
 
   std::vector<int> results;
   std::array<std::pair<int, int>, 2> v{{
-      {10, 20},
-      {30, 40}
-  }};
+                                           {10, 20},
+                                           {30, 40}
+                                       }};
 
   spl::apply(v,
              spl::expand_tuple(),
-             spl::for_each([&results](int a, int b) { results.push_back(a * b); }));
+             spl::for_each([&results](int a, int b) {
+               results.push_back(a * b);
+             }));
 
   EXPECT_THAT(results, ElementsAre(200, 1200));
 }
@@ -712,7 +754,8 @@ constexpr auto constexpr_for_each_count_test() {
 }
 
 TEST(SplTest, ForEachCount) {
-  static_assert(constexpr_for_each_count_test() == 3);  // 3, 4, 5 pass the filter
+  static_assert(
+      constexpr_for_each_count_test() == 3);  // 3, 4, 5 pass the filter
   EXPECT_EQ(constexpr_for_each_count_test(), 3);
 }
 
@@ -724,7 +767,8 @@ constexpr auto constexpr_transform_complete_test() {
 }
 
 TEST(SplTest, TransformComplete) {
-  static_assert(constexpr_transform_complete_test() == 30);  // (1+2+3+4+5)*2 = 15*2 = 30
+  static_assert(
+      constexpr_transform_complete_test() == 30);  // (1+2+3+4+5)*2 = 15*2 = 30
   EXPECT_EQ(constexpr_transform_complete_test(), 30);
 }
 
@@ -733,7 +777,9 @@ constexpr auto constexpr_transform_complete_multiple_test() {
   return spl::apply(v,
                     spl::tee(
                         spl::sum(),
-                        spl::compose(spl::transform([](int x) { return x * x; }), spl::sum())
+                        spl::compose(spl::transform([](int x) {
+                          return x * x;
+                        }), spl::sum())
                     ),
                     spl::transform_complete([](auto tuple) {
                       return std::get<0>(tuple) + std::get<1>(tuple);
@@ -741,7 +787,8 @@ constexpr auto constexpr_transform_complete_multiple_test() {
 }
 
 TEST(SplTest, TransformCompleteMultiple) {
-  static_assert(constexpr_transform_complete_multiple_test() == 68);  // sum=12, sum_squares=56, total=68
+  static_assert(constexpr_transform_complete_multiple_test()
+                    == 68);  // sum=12, sum_squares=56, total=68
   EXPECT_EQ(constexpr_transform_complete_multiple_test(), 68);
 }
 
@@ -752,18 +799,23 @@ constexpr auto constexpr_transform_complete_cps_test() {
                     spl::transform_complete_cps([](auto &&out, int x) {
                       return out(x / 10, x % 10);
                     }),
-                    spl::transform_complete([](int a, int b) { return a + b; }));
+                    spl::transform_complete([](int a, int b) {
+                      return a + b;
+                    }));
 }
 
 TEST(SplTest, TransformCompleteCps) {
-  static_assert(constexpr_transform_complete_cps_test() == 6);  // 60/10 + 60%10 = 6 + 0 = 6
+  static_assert(constexpr_transform_complete_cps_test()
+                    == 6);  // 60/10 + 60%10 = 6 + 0 = 6
   EXPECT_EQ(constexpr_transform_complete_cps_test(), 6);
 }
 
 TEST(SplTest, TransformCompleteWithVector) {
   auto result = spl::apply(std::vector{1, 2, 3, 4},
-                          spl::sum(),
-                          spl::transform_complete([](int x) { return x * 3; }));
+                           spl::sum(),
+                           spl::transform_complete([](int x) {
+                             return x * 3;
+                           }));
 
   EXPECT_EQ(result, 30);  // (1+2+3+4)*3 = 10*3 = 30
 }
@@ -778,7 +830,8 @@ constexpr auto constexpr_transform_complete_chain_test() {
 }
 
 TEST(SplTest, TransformCompleteChain) {
-  static_assert(constexpr_transform_complete_chain_test() == 14);  // ((30*2)+10)/5 = 70/5 = 14
+  static_assert(constexpr_transform_complete_chain_test()
+                    == 14);  // ((30*2)+10)/5 = 70/5 = 14
   EXPECT_EQ(constexpr_transform_complete_chain_test(), 14);
 }
 
@@ -789,11 +842,12 @@ constexpr auto constexpr_accumulate_in_place_with_type_calculator_test() {
                         []<typename... Types>(spl::types<Types...>) {
                           return spl::types<int>();
                         },
-                        [](int& acc, int x) { acc += x * x; }));
+                        [](int &acc, int x) { acc += x * x; }));
 }
 
 TEST(SplTest, AccumulateInPlaceWithTypeCalculator) {
-  static_assert(constexpr_accumulate_in_place_with_type_calculator_test() == 55);  // 1+4+9+16+25 = 55
+  static_assert(constexpr_accumulate_in_place_with_type_calculator_test()
+                    == 55);  // 1+4+9+16+25 = 55
   EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_test(), 55);
 }
 
@@ -804,23 +858,26 @@ constexpr auto constexpr_accumulate_in_place_with_type_calculator_product_test()
                         []<typename... Types>(spl::types<Types...>) {
                           return spl::types<int>();
                         },
-                        [](int& acc, int x) {
+                        [](int &acc, int x) {
                           if (acc == 0) acc = 1;
                           acc *= x;
                         }));
 }
 
 TEST(SplTest, AccumulateInPlaceWithTypeCalculatorProduct) {
-  static_assert(constexpr_accumulate_in_place_with_type_calculator_product_test() == 24);  // 2*3*4 = 24
-  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_product_test(), 24);
+  static_assert(
+      constexpr_accumulate_in_place_with_type_calculator_product_test()
+          == 24);  // 2*3*4 = 24
+  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_product_test(),
+            24);
 }
 
 constexpr auto constexpr_accumulate_in_place_with_type_calculator_pair_test() {
   constexpr std::array<std::pair<int, int>, 3> v{{
-      {1, 10},
-      {2, 20},
-      {3, 30}
-  }};
+                                                     {1, 10},
+                                                     {2, 20},
+                                                     {3, 30}
+                                                 }};
 
   struct Acc {
     int sum_first = 0;
@@ -828,31 +885,32 @@ constexpr auto constexpr_accumulate_in_place_with_type_calculator_pair_test() {
   };
 
   auto result = spl::apply(v,
-                          spl::expand_tuple(),
-                          spl::accumulate_in_place_with_type_calculator(
-                              []<typename... Types>(spl::types<Types...>) {
-                                return spl::types<Acc>();
-                              },
-                              [](Acc& acc, int a, int b) {
-                                acc.sum_first += a;
-                                acc.sum_second += b;
-                              }));
+                           spl::expand_tuple(),
+                           spl::accumulate_in_place_with_type_calculator(
+                               []<typename... Types>(spl::types<Types...>) {
+                                 return spl::types<Acc>();
+                               },
+                               [](Acc &acc, int a, int b) {
+                                 acc.sum_first += a;
+                                 acc.sum_second += b;
+                               }));
   return result.sum_first + result.sum_second;
 }
 
 TEST(SplTest, AccumulateInPlaceWithTypeCalculatorPair) {
-  static_assert(constexpr_accumulate_in_place_with_type_calculator_pair_test() == 66);  // (1+2+3)+(10+20+30) = 6+60 = 66
+  static_assert(constexpr_accumulate_in_place_with_type_calculator_pair_test()
+                    == 66);  // (1+2+3)+(10+20+30) = 6+60 = 66
   EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_pair_test(), 66);
 }
 
 TEST(SplTest, AccumulateInPlaceWithTypeCalculatorVector) {
   std::vector<int> v{5, 10, 15, 20};
   auto result = spl::apply(v,
-                          spl::accumulate_in_place_with_type_calculator(
-                              []<typename... Types>(spl::types<Types...>) {
-                                return spl::types<int>();
-                              },
-                              [](int& acc, int x) { acc += x; }));
+                           spl::accumulate_in_place_with_type_calculator(
+                               []<typename... Types>(spl::types<Types...>) {
+                                 return spl::types<int>();
+                               },
+                               [](int &acc, int x) { acc += x; }));
 
   EXPECT_EQ(result, 50);  // 5+10+15+20 = 50
 }
@@ -865,14 +923,172 @@ constexpr auto constexpr_accumulate_in_place_with_type_calculator_with_filter_te
                         []<typename... Types>(spl::types<Types...>) {
                           return spl::types<int>();
                         },
-                        [](int& acc, int x) { acc += x; }));
+                        [](int &acc, int x) { acc += x; }));
 }
 
 TEST(SplTest, AccumulateInPlaceWithTypeCalculatorWithFilter) {
-  static_assert(constexpr_accumulate_in_place_with_type_calculator_with_filter_test() == 20);  // 2+4+6+8 = 20
-  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_with_filter_test(), 20);
+  static_assert(
+      constexpr_accumulate_in_place_with_type_calculator_with_filter_test()
+          == 20);  // 2+4+6+8 = 20
+  EXPECT_EQ(constexpr_accumulate_in_place_with_type_calculator_with_filter_test(),
+            20);
 }
 
-
 }
 
+// to_map tests
+constexpr auto constexpr_to_map_test() {
+  constexpr std::array<std::pair<int, int>, 3> v{{
+                                                     {1, 10},
+                                                     {2, 20},
+                                                     {3, 30}
+                                                 }};
+
+  auto m = spl::apply(v, spl::expand_tuple(), spl::to_map<constexpr_map>());
+
+  int sum = 0;
+  for (auto &[k, v] : m) {
+    sum += k + v;
+  }
+  return sum;
+}
+
+TEST(SplTest, ToMap) {
+  static_assert(
+      constexpr_to_map_test() == 66);  // (1+10)+(2+20)+(3+30) = 11+22+33 = 66
+  EXPECT_EQ(constexpr_to_map_test(), 66);
+}
+
+TEST(SplTest, ToMapStdMap) {
+  std::array<std::pair<int, std::string>, 3> v{{
+                                                   {1, "one"},
+                                                   {2, "two"},
+                                                   {3, "three"}
+                                               }};
+
+  auto result = spl::apply(v, spl::expand_tuple(), spl::to_map<std::map>());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result[1], "one");
+  EXPECT_EQ(result[2], "two");
+  EXPECT_EQ(result[3], "three");
+}
+
+TEST(SplTest, ToMapWithTransform) {
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  auto result = spl::apply(v,
+                           spl::transform([](int x) {
+                             return std::make_pair(x, x * x);
+                           }),
+                           spl::expand_tuple(),
+                           spl::to_map<std::map>());
+
+  EXPECT_EQ(result.size(), 4);
+  EXPECT_EQ(result[1], 1);
+  EXPECT_EQ(result[2], 4);
+  EXPECT_EQ(result[3], 9);
+  EXPECT_EQ(result[4], 16);
+}
+
+TEST(SplTest, ToMapWithFilter) {
+  std::array<std::pair<int, std::string>, 5> v{{
+                                                   {1, "a"},
+                                                   {2, "b"},
+                                                   {3, "c"},
+                                                   {4, "d"},
+                                                   {5, "e"}
+                                               }};
+
+  auto result = spl::apply(v,
+                           spl::filter([](const auto &p) {
+                             return p.first % 2 == 0;
+                           }),
+                           spl::expand_tuple(),
+                           spl::to_map<std::map>());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[2], "b");
+  EXPECT_EQ(result[4], "d");
+}
+
+constexpr auto constexpr_to_map_with_zip_test() {
+  constexpr std::array v{5, 10, 15};
+
+  auto m = spl::apply(v,
+                      spl::zip_result([](int x) { return x * 2; }),
+                      spl::to_map<constexpr_map>());
+
+  int sum = 0;
+  for (auto &[k, v] : m) {
+    sum += v;
+  }
+  return sum;
+}
+
+TEST(SplTest, ToMapWithZipResult) {
+  static_assert(constexpr_to_map_with_zip_test() == 60);  // 10+20+30 = 60
+  EXPECT_EQ(constexpr_to_map_with_zip_test(), 60);
+
+  std::array v{1, 2, 3};
+  auto result = spl::apply(v,
+                           spl::zip_result([](int x) { return x * x; }),
+                           spl::to_map<std::map>());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result[1], 1);
+  EXPECT_EQ(result[2], 4);
+  EXPECT_EQ(result[3], 9);
+}
+
+TEST(SplTest, ToMapDuplicateKeys) {
+  // When duplicate keys are inserted, the map keeps the first one
+  std::array<std::pair<int, std::string>, 4> v{{
+                                                   {1, "first"},
+                                                   {2, "two"},
+                                                   {1, "second"},
+                                                   {3, "three"}
+                                               }};
+
+  auto result = spl::apply(v, spl::expand_tuple(), spl::to_map<std::map>());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result[1], "first");  // First insertion wins
+  EXPECT_EQ(result[2], "two");
+  EXPECT_EQ(result[3], "three");
+}
+
+constexpr auto constexpr_to_map_from_iota_test() {
+  auto m = spl::apply(spl::iota(1, 5),
+                      spl::transform_cps([](auto &&out, int x) {
+                        return out(x, x * 10);
+                      }),
+                      spl::to_map<constexpr_map>());
+
+  int sum = 0;
+  for (auto &[k, v] : m) {
+    sum += k + v;
+  }
+  return sum;
+}
+
+TEST(SplTest, ToMapFromIota) {
+  static_assert(constexpr_to_map_from_iota_test()
+                    == 110);  // (1+10)+(2+20)+(3+30)+(4+40) = 11+22+33+44 = 110
+  EXPECT_EQ(constexpr_to_map_from_iota_test(), 110);
+}
+
+TEST(SplTest, ToMapStringKeys) {
+  std::vector<std::pair<std::string, int>> v{
+      {"apple", 5},
+      {"banana", 3},
+      {"cherry", 8}
+  };
+
+  auto result = spl::apply(v, spl::expand_tuple(), spl::to_map<std::map>());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result["apple"], 5);
+  EXPECT_EQ(result["banana"], 3);
+  EXPECT_EQ(result["cherry"], 8);
+}
