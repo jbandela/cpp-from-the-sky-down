@@ -291,35 +291,6 @@ constexpr auto take(size_t
   });
 }
 
-struct iota_struct_base {};
-template<typename T>
-struct iota_struct : iota_struct_base {
-  T end;
-  T current;
-};
-
-template<typename Output, typename T>
-requires(std::is_base_of_v<iota_struct_base, std::decay_t<T>>)
-constexpr auto SkydownSplOutput(Output &&output, T &&is) {
-  if constexpr (calculate_type_v<Output>) {
-    return output(size_t(is.current));
-  } else {
-    for (; is.current < is.end; ++is.current) {
-      if (!output) return false;
-      output(size_t(is.current));
-    }
-    return true;
-  }
-}
-
-inline constexpr auto iota(size_t start) {
-  return iota_struct<size_t>{{}, std::numeric_limits<size_t>::max(), start};
-}
-
-inline constexpr auto iota(size_t start, size_t end) {
-  return iota_struct<size_t>{{}, end, start};
-}
-
 template<typename F>
 constexpr auto transform_cps(F f) {
   return flat_map([f = std::move(f)]<typename Out>(Out &&out,
@@ -669,6 +640,33 @@ requires(sizeof...(Rs) > 1)
 constexpr auto zip(Rs&&... rs){
   return compose(zip(std::forward<Rs>(rs))...);
 }
+
+
+inline constexpr auto iota(size_t start, size_t end) {
+  return generator([start,end](auto&& output, auto&&... args)mutable{
+    auto invoke = [&]{
+      return output(std::forward<decltype(args)>(args)...,size_t(start));
+    };
+
+    if constexpr (calculate_type_v<decltype(output)>) {
+      return invoke();
+    } else {
+      if(start < end){
+        invoke();
+        ++start;
+        return true;
+      } else{
+        return false;
+      }
+   }
+  });
+}
+inline constexpr auto iota(size_t start) {
+  return iota(start,std::numeric_limits<size_t>::max());
+}
+
+
+
 
 }
 
