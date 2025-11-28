@@ -528,10 +528,10 @@ template<typename R>
 constexpr auto SkydownSplMakeGenerator(
     R &&r)requires(std::ranges::range<std::remove_cvref_t<
     R>>) {
-  return generator([begin = r.begin(), end = r.end()](auto &&out)mutable {
+  return generator([begin = r.begin(), end = r.end()](auto &&out, auto&&... arg_stream)mutable {
     auto &&v = *begin;
     if constexpr (calculate_type_v<decltype(out)>) {
-      return out(
+      return out(std::forward<decltype(arg_stream)>(arg_stream)...,
           move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
               v)));
 
@@ -539,7 +539,7 @@ constexpr auto SkydownSplMakeGenerator(
       if (begin == end) {
         return false;
       }
-      out(
+      out(std::forward<decltype(arg_stream)>(arg_stream)...,
           move_if_movable_range<std::remove_cvref_t<
               R>>(std::forward<decltype(v)>(
               v)));
@@ -559,6 +559,20 @@ constexpr auto SkydownSplOutput(Output &&output,
     while(output && g(std::forward<Output>(output))){}
     return output;
   }
+}
+
+
+template<typename R>
+constexpr auto zip(R&& r){
+  return flat_map([g = SkydownSplMakeGenerator(std::forward<R>(r))](auto&& out, auto&&... args)mutable{
+    return g(std::forward<decltype(out)>(out),std::forward<decltype(args)>(args)...);
+  });
+}
+
+template<typename... Rs>
+requires(sizeof...(Rs) > 1)
+constexpr auto zip(Rs&&... rs){
+  return compose(zip(std::forward<Rs>(rs))...);
 }
 
 }

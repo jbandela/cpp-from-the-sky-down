@@ -5,6 +5,7 @@ namespace {
 
 using ::testing::Pair;
 using ::testing::ElementsAre;
+using ::testing::UnorderedElementsAre;
 
 // Constexpr-compatible map implementation using std::array with std::optional
 template<typename K, typename V, std::size_t MaxSize = 10>
@@ -1107,7 +1108,7 @@ TEST(SplTest, GeneratorBasic) {
   });
 
   auto result = spl::apply(std::move(gen), spl::to_vector());
-  
+
   EXPECT_THAT(result, ElementsAre(0, 1, 2, 3, 4));
 }
 
@@ -1123,9 +1124,9 @@ TEST(SplTest, GeneratorWithTransform) {
   });
 
   auto result = spl::apply(std::move(gen),
-                          spl::transform([](int x) { return x * x; }),
-                          spl::to_vector());
-  
+                           spl::transform([](int x) { return x * x; }),
+                           spl::to_vector());
+
   EXPECT_THAT(result, ElementsAre(1, 4, 9, 16));
 }
 
@@ -1141,9 +1142,9 @@ TEST(SplTest, GeneratorWithFilter) {
   });
 
   auto result = spl::apply(std::move(gen),
-                          spl::filter([](int x) { return x % 2 == 0; }),
-                          spl::to_vector());
-  
+                           spl::filter([](int x) { return x % 2 == 0; }),
+                           spl::to_vector());
+
   EXPECT_THAT(result, ElementsAre(0, 2, 4, 6, 8));
 }
 
@@ -1158,9 +1159,9 @@ TEST(SplTest, GeneratorWithTake) {
   });
 
   auto result = spl::apply(std::move(gen),
-                          spl::take(5),
-                          spl::to_vector());
-  
+                           spl::take(5),
+                           spl::to_vector());
+
   EXPECT_THAT(result, ElementsAre(0, 1, 2, 3, 4));
 }
 
@@ -1176,7 +1177,7 @@ TEST(SplTest, GeneratorWithSum) {
   });
 
   auto result = spl::apply(std::move(gen), spl::sum());
-  
+
   EXPECT_EQ(result, 15);  // 1+2+3+4+5 = 15
 }
 
@@ -1198,7 +1199,7 @@ TEST(SplTest, GeneratorFibonacci) {
   });
 
   auto result = spl::apply(std::move(gen), spl::to_vector());
-  
+
   EXPECT_THAT(result, ElementsAre(0, 1, 1, 2, 3, 5, 8, 13, 21, 34));
 }
 
@@ -1214,13 +1215,14 @@ TEST(SplTest, GeneratorWithGroupBy) {
   });
 
   auto result = spl::apply(std::move(gen),
-                          spl::transform([](int x) { 
-                            return std::make_pair(x % 3, x); 
-                          }),
-                          spl::group_by(&std::pair<int, int>::first,
-                                       spl::transform(&std::pair<int, int>::second),
-                                       spl::sum()),
-                          spl::to_vector());
+                           spl::transform([](int x) {
+                             return std::make_pair(x % 3, x);
+                           }),
+                           spl::group_by(&std::pair<int, int>::first,
+                                         spl::transform(&std::pair<int,
+                                                                   int>::second),
+                                         spl::sum()),
+                           spl::to_vector());
 
   using pair_type = std::pair<int, int>;
   EXPECT_THAT(result, ElementsAre(
@@ -1263,11 +1265,16 @@ TEST(SplTest, GeneratorMultipleIterations) {
   });
 
   auto result = spl::apply(std::move(gen),
-                          spl::expand_tuple(),
-                          spl::transform([](int k, int v) { return k + v; }),
-                          spl::to_vector());
-  
-  EXPECT_THAT(result, ElementsAre(0, 11, 22, 33, 44));  // (0+0), (1+10), (2+20), (3+30), (4+40)
+                           spl::expand_tuple(),
+                           spl::transform([](int k, int v) { return k + v; }),
+                           spl::to_vector());
+
+  EXPECT_THAT(result,
+              ElementsAre(0,
+                          11,
+                          22,
+                          33,
+                          44));  // (0+0), (1+10), (2+20), (3+30), (4+40)
 }
 
 constexpr auto calculate_generator() {
@@ -1286,4 +1293,253 @@ TEST(SplTest, ConstexprCalculateGenerator) {
   static_assert(calculate_generator() == 18);
   EXPECT_THAT(calculate_generator(), 18);
 
+}
+
+constexpr auto constexpr_zip_to_map_test() {
+  constexpr std::array<int, 3> v1{{
+                                      1,
+                                      2,
+                                      3
+                                  }};
+
+  constexpr std::array<int, 3> v2{{
+                                      10,
+                                      20,
+                                      30
+                                  }};
+
+  auto m = spl::apply(v1, spl::zip(v2), spl::to_map<constexpr_map>());
+
+  int sum = 0;
+  for (auto &[k, v] : m) {
+    sum += k + v;
+  }
+  return sum;
+}
+
+TEST(SplTest, ZipToMap) {
+  static_assert(
+      constexpr_to_map_test() == 66);  // (1+10)+(2+20)+(3+30) = 11+22+33 = 66
+  EXPECT_EQ(constexpr_to_map_test(), 66);
+}
+// Additional Zip tests
+TEST(SplTest, ZipBasic) {
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{10, 20, 30, 40};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::make_pair(),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(
+      Pair(1, 10),
+      Pair(2, 20),
+      Pair(3, 30),
+      Pair(4, 40)
+  ));
+}
+
+constexpr auto constexpr_zip_basic_test() {
+  constexpr std::array<int, 3> v1{1, 2, 3};
+  constexpr std::array<int, 3> v2{4, 5, 6};
+
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::transform([](int a, int b) { return a + b; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipBasicConstexpr) {
+  static_assert(constexpr_zip_basic_test() == 21);  // (1+4)+(2+5)+(3+6) = 5+7+9 = 21
+  EXPECT_EQ(constexpr_zip_basic_test(), 21);
+}
+
+TEST(SplTest, ZipWithTransform) {
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{5, 6, 7, 8};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::transform([](int a, int b) { return a * b; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(5, 12, 21, 32));  // 1*5, 2*6, 3*7, 4*8
+}
+
+TEST(SplTest, ZipWithFilter) {
+  std::array<int, 5> v1{1, 2, 3, 4, 5};
+  std::array<int, 5> v2{10, 20, 30, 40, 50};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::filter([](int a, int b) { return (a + b) % 3 == 0; }),
+                          spl::make_pair(),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(
+      Pair(3, 30)  // 3+30=33, divisible by 3
+  ));
+}
+
+TEST(SplTest, ZipMultipleRanges) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{10, 20, 30};
+  std::array<int, 3> v3{100, 200, 300};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2, v3),
+                          spl::transform([](int a, int b, int c) { return a + b + c; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(111, 222, 333));  // 1+10+100, 2+20+200, 3+30+300
+}
+
+constexpr auto constexpr_zip_multiple_test() {
+  constexpr std::array<int, 4> v1{1, 2, 3, 4};
+  constexpr std::array<int, 4> v2{10, 10, 10, 10};
+  constexpr std::array<int, 4> v3{100, 100, 100, 100};
+
+  return spl::apply(v1,
+                   spl::zip(v2, v3),
+                   spl::transform([](int a, int b, int c) { return a + b + c; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipMultipleConstexpr) {
+  static_assert(constexpr_zip_multiple_test() == 450);  // (1+10+100)*4 + (1+2+3) = 111*4 + 6 = 444 + 6 = 450
+  EXPECT_EQ(constexpr_zip_multiple_test(), 450);
+}
+
+TEST(SplTest, ZipDifferentTypes) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<std::string, 3> v2{"a", "b", "c"};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::make_pair(),
+                          spl::to_vector());
+
+  using pair_type = std::pair<int, std::string>;
+  EXPECT_THAT(result, ElementsAre(
+      pair_type{1, "a"},
+      pair_type{2, "b"},
+      pair_type{3, "c"}
+  ));
+}
+
+TEST(SplTest, ZipToTuple) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{4, 5, 6};
+  std::array<int, 3> v3{7, 8, 9};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2, v3),
+                          spl::make_tuple(),
+                          spl::to_vector());
+
+  using tuple_type = std::tuple<int, int, int>;
+  EXPECT_THAT(result, ElementsAre(
+      tuple_type{1, 4, 7},
+      tuple_type{2, 5, 8},
+      tuple_type{3, 6, 9}
+  ));
+}
+
+TEST(SplTest, ZipWithSum) {
+  std::array<int, 5> v1{1, 2, 3, 4, 5};
+  std::array<int, 5> v2{5, 4, 3, 2, 1};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::transform([](int a, int b) { return a * b; }),
+                          spl::sum());
+
+  EXPECT_EQ(result, 35);  // 1*5 + 2*4 + 3*3 + 4*2 + 5*1 = 5+8+9+8+5 = 35
+}
+
+TEST(SplTest, ZipWithTake) {
+  std::array<int, 10> v1{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::array<int, 10> v2{10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::take(5),
+                          spl::make_pair(),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(
+      Pair(0, 10),
+      Pair(1, 11),
+      Pair(2, 12),
+      Pair(3, 13),
+      Pair(4, 14)
+  ));
+}
+
+TEST(SplTest, ZipWithGroupBy) {
+  std::array<int, 6> v1{1, 2, 3, 4, 5, 6};
+  std::array<int, 6> v2{10, 20, 30, 40, 50, 60};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::transform([](int a, int b) {
+                            return std::make_pair(a % 2, b);  // Group by odd/even
+                          }),
+                          spl::group_by(&std::pair<int, int>::first,
+                                       spl::transform(&std::pair<int, int>::second),
+                                       spl::sum()),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, UnorderedElementsAre(
+      Pair(1, 90),   // Odd: 10+30+50=90
+      Pair(0, 120)   // Even: 20+40+60=120
+  ));
+}
+
+
+TEST(SplTest, ZipNested) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{10, 20, 30};
+  std::array<int, 3> v3{100, 200, 300};
+  std::array<int, 3> v4{1000, 2000, 3000};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::zip(v3),
+                          spl::zip(v4),
+                          spl::transform([](int a, int b, int c, int d) {
+                            return a + b + c + d;
+                          }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1111, 2222, 3333));
+}
+
+constexpr auto constexpr_zip_with_iota_test() {
+  constexpr std::array<int, 5> v{10, 20, 30, 40, 50};
+
+  return spl::apply(spl::iota(0, 5),
+                   spl::zip(v),
+                   spl::transform([](int idx, int val) { return idx * val; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipWithIota) {
+  static_assert(constexpr_zip_with_iota_test() == 400);  // 0*10 + 1*20 + 2*30 + 3*40 + 4*50 = 0+20+60+120+200 = 400
+  EXPECT_EQ(constexpr_zip_with_iota_test(), 400);
+}
+
+TEST(SplTest, ZipStringValues) {
+  std::array<std::string, 3> v1{"hello", "world", "test"};
+  std::array<int, 3> v2{1, 2, 3};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::transform([](const std::string& s, int n) {
+                            return s + std::to_string(n);
+                          }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre("hello1", "world2", "test3"));
 }
