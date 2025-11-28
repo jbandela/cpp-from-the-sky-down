@@ -153,6 +153,7 @@ constexpr auto constexpr_group_by_test() {
                     spl::group_by<constexpr_map_factory<>>(&pair::first,
                                                            spl::transform(&pair::second),
                                                            spl::sum()),
+                    spl::make_pair(),
                     spl::transform([](auto &&p) { return p.second; }),
                     spl::sum());
 }
@@ -169,6 +170,7 @@ TEST(SplTest, GroupBy) {
                            spl::group_by(&pair::first,
                                          spl::transform(&pair::second),
                                          spl::sum()),
+                           spl::make_pair(),
                            spl::to_vector());
 
   EXPECT_THAT(result, ElementsAre(Pair("a", 3), Pair("b", 4)));
@@ -1222,6 +1224,7 @@ TEST(SplTest, GeneratorWithGroupBy) {
                                          spl::transform(&std::pair<int,
                                                                    int>::second),
                                          spl::sum()),
+                           spl::make_pair(),
                            spl::to_vector());
 
   using pair_type = std::pair<int, int>;
@@ -1489,6 +1492,7 @@ TEST(SplTest, ZipWithGroupBy) {
                           spl::group_by(&std::pair<int, int>::first,
                                        spl::transform(&std::pair<int, int>::second),
                                        spl::sum()),
+                          spl::make_pair(),
                           spl::to_vector());
 
   EXPECT_THAT(result, UnorderedElementsAre(

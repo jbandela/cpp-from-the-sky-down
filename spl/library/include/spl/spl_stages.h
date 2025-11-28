@@ -481,9 +481,9 @@ struct group_by_impl<StageProperties,
                                                     processing_style::incremental>(
       std::declval<Composed>()));
 
-  using output_types = types<std::pair<key,
-                                       std::remove_cvref_t<decltype(std::declval<
-                                           pipeline_type>().finish())>> &&>;
+  using output_types = types<key,
+                                       decltype(std::declval<
+                                           pipeline_type>().finish()) >;
 
   typename MapType::template type<key, pipeline_type> map;
 
@@ -503,7 +503,7 @@ struct group_by_impl<StageProperties,
 
   constexpr decltype(auto) finish() {
     for (auto &&[k, v] : map) {
-      this->next.process_incremental(std::make_pair(k, v.finish()));
+      this->next.process_incremental(k, v.finish());
     }
     return this->next.finish();
   }
