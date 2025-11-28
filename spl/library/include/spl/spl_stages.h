@@ -515,6 +515,52 @@ constexpr auto tee(Stages &&... stages) {
   return tee_helper((std::forward<Stages>(stages))...);
 }
 
+template<typename F>
+struct generator:F {
+    using F::operator();
+};
+
+
+template<typename F>
+generator(F) -> generator<F>;
+
+template<typename R>
+constexpr auto SkydownSplMakeGenerator(
+    R &&r)requires(std::ranges::range<std::remove_cvref_t<
+    R>>) {
+  return generator([begin = r.begin(), end = r.end()](auto &&out)mutable {
+    auto &&v = *begin;
+    if constexpr (calculate_type_v<decltype(out)>) {
+      return out(
+          move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
+              v)));
+
+    } else {
+      if (begin == end) {
+        return false;
+      }
+      out(
+          move_if_movable_range<std::remove_cvref_t<
+              R>>(std::forward<decltype(v)>(
+              v)));
+      ++begin;
+      return true;
+
+    }
+  });
+}
+
+template<typename Output, typename F>
+constexpr auto SkydownSplOutput(Output &&output,
+                                generator<F>&& g){
+  if constexpr (calculate_type_v<Output>) {
+    return g(std::forward<Output>(output));
+  } else {
+    while(output && g(std::forward<Output>(output))){}
+    return output;
+  }
+}
+
 }
 
 #endif //SKYDOWN_SPL_STAGES_H_

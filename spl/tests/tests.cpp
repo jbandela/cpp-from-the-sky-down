@@ -1092,3 +1092,198 @@ TEST(SplTest, ToMapStringKeys) {
   EXPECT_EQ(result["banana"], 3);
   EXPECT_EQ(result["cherry"], 8);
 }
+
+// Generator tests
+TEST(SplTest, GeneratorBasic) {
+  // Create a simple generator that yields values
+  auto gen = spl::generator([i = 0](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i >= 5) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen), spl::to_vector());
+  
+  EXPECT_THAT(result, ElementsAre(0, 1, 2, 3, 4));
+}
+
+TEST(SplTest, GeneratorWithTransform) {
+  auto gen = spl::generator([i = 1](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i > 4) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen),
+                          spl::transform([](int x) { return x * x; }),
+                          spl::to_vector());
+  
+  EXPECT_THAT(result, ElementsAre(1, 4, 9, 16));
+}
+
+TEST(SplTest, GeneratorWithFilter) {
+  auto gen = spl::generator([i = 0](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i >= 10) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen),
+                          spl::filter([](int x) { return x % 2 == 0; }),
+                          spl::to_vector());
+  
+  EXPECT_THAT(result, ElementsAre(0, 2, 4, 6, 8));
+}
+
+TEST(SplTest, GeneratorWithTake) {
+  auto gen = spl::generator([i = 0](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      out(i++);
+      return true;  // Infinite generator
+    }
+  });
+
+  auto result = spl::apply(std::move(gen),
+                          spl::take(5),
+                          spl::to_vector());
+  
+  EXPECT_THAT(result, ElementsAre(0, 1, 2, 3, 4));
+}
+
+TEST(SplTest, GeneratorWithSum) {
+  auto gen = spl::generator([i = 1](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i > 5) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen), spl::sum());
+  
+  EXPECT_EQ(result, 15);  // 1+2+3+4+5 = 15
+}
+
+TEST(SplTest, GeneratorFibonacci) {
+  // Fibonacci generator
+  auto gen = spl::generator([a = 0, b = 1, count = 0](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(a));
+    } else {
+      if (count >= 10) return false;
+      int current = a;
+      out(std::move(current));
+      int next = a + b;
+      a = b;
+      b = next;
+      count++;
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen), spl::to_vector());
+  
+  EXPECT_THAT(result, ElementsAre(0, 1, 1, 2, 3, 5, 8, 13, 21, 34));
+}
+
+TEST(SplTest, GeneratorWithGroupBy) {
+  auto gen = spl::generator([i = 0](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i >= 10) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen),
+                          spl::transform([](int x) { 
+                            return std::make_pair(x % 3, x); 
+                          }),
+                          spl::group_by(&std::pair<int, int>::first,
+                                       spl::transform(&std::pair<int, int>::second),
+                                       spl::sum()),
+                          spl::to_vector());
+
+  using pair_type = std::pair<int, int>;
+  EXPECT_THAT(result, ElementsAre(
+      Pair(0, 18),  // 0+3+6+9 = 18
+      Pair(1, 12),  // 1+4+7 = 12
+      Pair(2, 15)   // 2+5+8 = 15
+  ));
+}
+
+constexpr auto constexpr_generator_test() {
+  auto gen = spl::generator([i = 1](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i > 5) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  return spl::apply(std::move(gen), spl::sum());
+}
+
+TEST(SplTest, GeneratorConstexpr) {
+  static_assert(constexpr_generator_test() == 15);  // 1+2+3+4+5 = 15
+  EXPECT_EQ(constexpr_generator_test(), 15);
+}
+
+TEST(SplTest, GeneratorMultipleIterations) {
+  // Test that generator can be used to produce pairs
+  auto gen = spl::generator([i = 0](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(std::pair<int, int>(i, i * 10));
+    } else {
+      if (i >= 5) return false;
+      out(std::make_pair(i, i * 10));
+      i++;
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen),
+                          spl::expand_tuple(),
+                          spl::transform([](int k, int v) { return k + v; }),
+                          spl::to_vector());
+  
+  EXPECT_THAT(result, ElementsAre(0, 11, 22, 33, 44));  // (0+0), (1+10), (2+20), (3+30), (4+40)
+}
+
+constexpr auto calculate_generator() {
+  constexpr std::array v{1, 2, 3, 4};
+  auto t = spl::compose(
+      spl::filter([](int i) { return i != 2; }),
+      spl::sum());
+  using spl::SkydownSplMakeGenerator;
+  return spl::apply(SkydownSplMakeGenerator(v),
+                    spl::transform([](int i) { return i * 2; }),
+                    std::move(t));
+
+}
+
+TEST(SplTest, ConstexprCalculateGenerator) {
+  static_assert(calculate_generator() == 18);
+  EXPECT_THAT(calculate_generator(), 18);
+
+}
