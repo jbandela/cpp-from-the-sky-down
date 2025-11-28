@@ -6,6 +6,104 @@
 
 namespace spl {
 
+// ============================================================================
+// Forward Declarations - User-facing Stage Functions
+// ============================================================================
+
+// Accumulation stages
+template<typename T, typename F>
+constexpr auto accumulate_in_place(T t, F f);
+
+template<typename TypeCalculator, typename F>
+constexpr auto accumulate_in_place_with_type_calculator(TypeCalculator t, F f);
+
+template<typename T, typename F>
+constexpr auto accumulate(T t, F f);
+
+template<typename F>
+constexpr auto accumulate(F f);
+
+template<typename F>
+constexpr auto for_each(F f);
+
+constexpr auto sum();
+
+// Transformation stages
+template<typename F>
+constexpr auto transform(F f);
+
+template<typename F>
+constexpr auto transform_cps(F f);
+
+template<typename F>
+constexpr auto transform_complete(F f);
+
+template<typename F>
+constexpr auto transform_complete_cps(F f);
+
+// Filtering and selection stages
+template<typename Predicate>
+constexpr auto filter(Predicate predicate);
+
+constexpr auto take(size_t n);
+
+// Flattening and mapping stages
+template<typename F>
+constexpr auto flat_map(F f);
+
+constexpr auto flatten();
+
+// Tuple/pair manipulation
+inline constexpr auto expand_tuple();
+inline constexpr auto make_tuple();
+inline constexpr auto make_pair();
+
+// Zipping stages
+template<typename F>
+constexpr auto zip_result(F f);
+
+template<typename R>
+constexpr auto zip(R&& r);
+
+template<typename... Rs>
+constexpr auto zip(Rs&&... rs);
+
+// Swizzle (reorder/select tuple elements)
+template<std::size_t... Indices>
+constexpr auto swizzle();
+
+// Grouping stages
+template<typename MapType, typename SelectorF, typename... Stages>
+constexpr auto group_by(SelectorF selector_f, Stages... stages);
+
+// Tee (parallel processing)
+template<typename... Stages>
+constexpr auto tee(Stages&&... stages);
+
+// Collection builders
+template<template<typename...> typename C>
+constexpr auto push_back_to();
+
+constexpr auto to_vector();
+
+template<template<typename, typename> typename MapType>
+constexpr auto to_map();
+
+// Generators and sources
+inline constexpr auto iota(size_t start);
+inline constexpr auto iota(size_t start, size_t end);
+
+template<typename F>
+struct generator;
+
+template<typename R>
+constexpr auto SkydownSplMakeGenerator(R&& r);
+
+// ============================================================================
+// Implementation Details
+// ============================================================================
+
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename T, typename F>
 struct accumulate_in_place_impl;
@@ -105,19 +203,17 @@ constexpr auto sum() {
 }
 
 // Forward declaration
-template<typename StageProperties, typename InputTypes, typename F, typename OutputTypeCalculator>
+template<typename StageProperties, typename InputTypes, typename F>
 struct flat_map_impl;
 
 // Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes, typename F, typename OutputTypeCalculator>
+template<typename StageProperties, typename... InputTypes, typename F>
 struct flat_map_impl<StageProperties,
                      types<InputTypes...>,
-                     F,
-                     OutputTypeCalculator>
+                     F>
     : stage_impl<flat_map_impl<StageProperties,
                                types<InputTypes...>,
-                               F,
-                               OutputTypeCalculator>> {
+                               F>> {
   using base = typename flat_map_impl::base;
   using output_types = decltype(std::invoke(std::declval<F>(),
                                             type_calculating_outputter(),
@@ -143,13 +239,12 @@ struct IdentityOutputCalculator {
   using output_types = types<Ts...>;
 };
 
-template<typename OutputCalculator = IdentityOutputCalculator, typename F>
+template<typename F>
 constexpr auto flat_map(F f) {
   return stage<flat_map_impl,
                processing_style::incremental,
                processing_style::incremental,
-               F,
-               OutputCalculator>(std::move(f));
+               F>(std::move(f));
 
 }
 
