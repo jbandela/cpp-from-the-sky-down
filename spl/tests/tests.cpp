@@ -1547,3 +1547,322 @@ TEST(SplTest, ZipStringValues) {
 
   EXPECT_THAT(result, ElementsAre("hello1", "world2", "test3"));
 }
+
+// chain_before and chain_after tests
+TEST(SplTest, ChainBeforeBasic) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{-1, 0};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(-1, 0, 1, 2, 3));
+}
+
+TEST(SplTest, ChainAfterBasic) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{4, 5};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+constexpr auto constexpr_chain_before_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{1, 2};
+
+  return spl::apply(v1,
+                   spl::chain_before(v2),
+                   spl::sum());
+}
+
+TEST(SplTest, ChainBeforeConstexpr) {
+  static_assert(constexpr_chain_before_test() == 63);  // 1+2+10+20+30 = 63
+  EXPECT_EQ(constexpr_chain_before_test(), 63);
+}
+
+constexpr auto constexpr_chain_after_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{1, 2};
+
+  return spl::apply(v1,
+                   spl::chain_after(v2),
+                   spl::sum());
+}
+
+TEST(SplTest, ChainAfterConstexpr) {
+  static_assert(constexpr_chain_after_test() == 63);  // 10+20+30+1+2 = 63
+  EXPECT_EQ(constexpr_chain_after_test(), 63);
+}
+
+TEST(SplTest, ChainBeforeWithTransform) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{10, 20};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::transform([](int x) { return x * 2; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(20, 40, 2, 4, 6));  // [10, 20, 1, 2, 3] * 2
+}
+
+TEST(SplTest, ChainAfterWithTransform) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{10, 20};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::transform([](int x) { return x * 2; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(2, 4, 6, 20, 40));  // [1, 2, 3, 10, 20] * 2
+}
+
+TEST(SplTest, ChainBeforeWithFilter) {
+  std::array<int, 5> v1{1, 2, 3, 4, 5};
+  std::array<int, 3> v2{0, 10, 20};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::filter([](int x) { return x % 2 == 0; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(0, 10, 20, 2, 4));  // Even numbers from [0, 10, 20, 1, 2, 3, 4, 5]
+}
+
+TEST(SplTest, ChainAfterWithFilter) {
+  std::array<int, 5> v1{1, 2, 3, 4, 5};
+  std::array<int, 3> v2{6, 7, 8};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::filter([](int x) { return x > 3; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(4, 5, 6, 7, 8));  // >3 from [1, 2, 3, 4, 5, 6, 7, 8]
+}
+
+TEST(SplTest, ChainBeforeEmpty) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 0> v2{};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));  // Empty chain has no effect
+}
+
+TEST(SplTest, ChainAfterEmpty) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 0> v2{};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));  // Empty chain has no effect
+}
+
+TEST(SplTest, ChainBeforeEmptySource) {
+  std::array<int, 0> v1{};
+  std::array<int, 3> v2{1, 2, 3};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));  // Only chained items
+}
+
+TEST(SplTest, ChainAfterEmptySource) {
+  std::array<int, 0> v1{};
+  std::array<int, 3> v2{1, 2, 3};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));  // Only chained items
+}
+
+TEST(SplTest, ChainBeforeAndAfter) {
+  std::array<int, 3> v1{10, 20, 30};
+  std::array<int, 2> v2{1, 2};
+  std::array<int, 2> v3{100, 200};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::chain_after(v3),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 10, 20, 30, 100, 200));
+}
+
+TEST(SplTest, ChainMultipleBefore) {
+  std::array<int, 2> v1{10, 20};
+  std::array<int, 2> v2{5, 6};
+  std::array<int, 2> v3{1, 2};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::chain_before(v3),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 5, 6, 10, 20));
+}
+
+TEST(SplTest, ChainMultipleAfter) {
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+  std::array<int, 2> v3{100, 200};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::chain_after(v3),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 10, 20, 100, 200));
+}
+
+TEST(SplTest, ChainBeforeWithIota) {
+  std::array<int, 2> v{100, 200};
+
+  auto result = spl::apply(spl::iota(0, 5),
+                          spl::chain_before(v),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(100, 200, 0, 1, 2, 3, 4));
+}
+
+TEST(SplTest, ChainAfterWithIota) {
+  std::array<int, 2> v{100, 200};
+
+  auto result = spl::apply(spl::iota(0, 5),
+                          spl::chain_after(v),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(0, 1, 2, 3, 4, 100, 200));
+}
+
+TEST(SplTest, ChainBeforeWithTake) {
+  std::array v1{1, 2, 3, 4, 5};
+  std::array<int, 2> v2{-1, 0};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::take(4),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(-1, 0, 1, 2));  // Takes first 4 from [-1, 0, 1, 2, 3, 4, 5]
+}
+
+TEST(SplTest, ChainAfterWithSum) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{10, 20};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::sum());
+
+  EXPECT_EQ(result, 36);  // 1+2+3+10+20 = 36
+}
+
+TEST(SplTest, ChainBeforeVectors) {
+  std::vector<int> v1{5, 6, 7};
+  std::vector<int> v2{1, 2, 3};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 5, 6, 7));
+}
+
+TEST(SplTest, ChainAfterVectors) {
+  std::vector<int> v1{1, 2, 3};
+  std::vector<int> v2{10, 20, 30};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 10, 20, 30));
+}
+
+TEST(SplTest, ChainBeforeDifferentTypes) {
+  std::array<std::string, 2> v1{"world", "!"};
+  std::array<std::string, 2> v2{"Hello", " "};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre("Hello", " ", "world", "!"));
+}
+
+TEST(SplTest, ChainAfterWithGroupBy) {
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 2> v2{5, 6};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::transform([](int x) { return std::make_pair(x % 2, x); }),
+                          spl::group_by(&std::pair<int, int>::first,
+                                       spl::transform(&std::pair<int, int>::second),
+                                       spl::sum()),
+                          spl::make_pair(),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(
+      Pair(0, 12),   // Even: 2+4+6 = 12
+      Pair(1, 9)   // Odd: 1+3+5 = 9
+  ));
+}
+
+constexpr auto constexpr_chain_combined_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{1, 2};
+  constexpr std::array<int, 2> v3{100, 200};
+
+  return spl::apply(v1,
+                   spl::chain_before(v2),
+                   spl::chain_after(v3),
+                   spl::transform([](int x) { return x / 10; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ChainBeforeAfterConstexpr) {
+  static_assert(constexpr_chain_combined_test() == 36);  // (1+2+10+20+30+100+200)/10 = 363/10 = 36.3 -> 36
+  EXPECT_EQ(constexpr_chain_combined_test(), 36);
+}
+
+TEST(SplTest, ChainBeforeWithZip) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{0, -1};
+  std::array<int, 5> v3{10, 20, 30, 40, 50};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::zip(v3),
+                          spl::transform([](int a, int b) { return a + b; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(10, 19, 31, 42, 53));  // [0, -1, 1, 2, 3] + [10, 20, 30, 40, 50]
+}
+
+TEST(SplTest, ChainAfterSingleElement) {
+  std::array<int, 1> v1{42};
+  std::array<int, 3> v2{1, 2, 3};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(42, 1, 2, 3));
+}

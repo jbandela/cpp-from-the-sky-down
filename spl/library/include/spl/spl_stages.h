@@ -68,6 +68,19 @@ constexpr auto zip(R&& r);
 template<typename... Rs>
 constexpr auto zip(Rs&&... rs);
 
+template<typename R>
+constexpr auto zip_exact(R&& r);
+
+template<typename... Rs>
+constexpr auto zip_exact(Rs&&... rs);
+
+// Chaining stages
+template<typename R>
+constexpr auto chain_before(R&& r);
+
+template<typename R>
+constexpr auto chain_after(R&& r);
+
 // Swizzle (reorder/select tuple elements)
 template<std::size_t... Indices>
 constexpr auto swizzle();
@@ -635,6 +648,7 @@ constexpr auto zip(R&& r){
   });
 }
 
+
 template<typename... Rs>
 requires(sizeof...(Rs) > 1)
 constexpr auto zip(Rs&&... rs){
@@ -668,6 +682,66 @@ inline constexpr auto iota(size_t start) {
 
 
 
+
+// Chain position enum
+enum class chain_position {
+  before,
+  after
+};
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename R, typename Position>
+struct chain_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename R, chain_position Position>
+struct chain_impl<StageProperties, types<InputTypes...>, R, std::integral_constant<chain_position, Position>>
+    : stage_impl<chain_impl<StageProperties, types<InputTypes...>, R, std::integral_constant<chain_position,Position>>> {
+  using base = typename chain_impl::base;
+  using output_types = types<InputTypes...>;
+  
+  [[no_unique_address]] R range;
+  bool first_call = true;
+  
+  constexpr void process_incremental(InputTypes... inputs) {
+    if constexpr (Position == chain_position::before) {
+      if (first_call) {
+        first_call = false;
+        // Output all items from the chained sequence before the first element
+
+        SkydownSplOutput(incremental_outputter{this->next}, range);
+      }
+    }
+    // Output the current input
+    this->next.process_incremental(std::forward<InputTypes>(inputs)...);
+  }
+  
+  constexpr decltype(auto) finish() {
+    if (first_call || Position == chain_position::after) {
+      // Output all items from the chained sequence after all inputs
+      SkydownSplOutput(incremental_outputter{this->next}, range);
+    }
+    return this->next.finish();
+  }
+};
+
+template<typename R>
+constexpr auto chain_before(R&& r) {
+  return stage<chain_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               R,
+               std::integral_constant<chain_position, chain_position::before>>(std::forward<R>(r));
+}
+
+template<typename R>
+constexpr auto chain_after(R&& r) {
+  return stage<chain_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               R,
+               std::integral_constant<chain_position, chain_position::after>>(std::forward<R>(r));
+}
 }
 
 #endif //SKYDOWN_SPL_STAGES_H_

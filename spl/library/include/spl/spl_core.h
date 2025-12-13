@@ -293,7 +293,7 @@ constexpr auto stage(Ts &&... ts) {
   return stage_instantiator<StageImpl,
                             InputProcessingStyle,
                             OutputProcessingStyle,
-                            std::tuple<std::remove_cvref_t<Ts>...>,
+                            std::tuple<Ts...>,
                             TypeParameters...>(std::forward<
       decltype(ts)>(ts)...);
 }
