@@ -2,6 +2,7 @@
 #define SKYDOWN_SPL_STAGES_H_
 
 #include "spl_core.h"
+#include <algorithm>
 #include <map>
 
 namespace spl {
@@ -40,6 +41,12 @@ constexpr auto transform_complete(F f);
 
 template<typename F>
 constexpr auto transform_complete_cps(F f);
+
+// Sorting stages
+template<typename Comparator>
+constexpr auto sort(Comparator comp);
+
+constexpr auto sort();
 
 // Filtering and selection stages
 template<typename Predicate>
@@ -377,6 +384,20 @@ constexpr auto transform_complete(F f) {
                                                    auto &&... inputs) {
     return out(std::invoke(f, std::forward<decltype(inputs)>(inputs)...));
   });
+}
+
+template<typename Comparator>
+constexpr auto sort(Comparator comp) {
+  return transform_complete_cps([comp = std::move(comp)](auto &&out,
+                                                         auto &&container) {
+    auto sorted = std::forward<decltype(container)>(container);
+    std::sort(sorted.begin(), sorted.end(), comp);
+    return out(std::move(sorted));
+  });
+}
+
+constexpr auto sort() {
+  return sort(std::less<>{});
 }
 
 inline constexpr auto expand_tuple() {

@@ -1866,3 +1866,231 @@ TEST(SplTest, ChainAfterSingleElement) {
 
   EXPECT_THAT(result, ElementsAre(42, 1, 2, 3));
 }
+
+// Sort tests
+constexpr auto constexpr_sort_test() {
+  constexpr std::array v{3, 1, 4, 1, 5, 9, 2, 6};
+  auto sorted = spl::apply(v, spl::to_vector(), spl::sort());
+  int result = 0;
+  for (auto x : sorted) {
+    result = result * 10 + x;
+  }
+  return result;
+}
+
+TEST(SplTest, SortConstexpr) {
+  static_assert(constexpr_sort_test() == 11234569);  // digits: 1,1,2,3,4,5,6,9
+  EXPECT_EQ(constexpr_sort_test(), 11234569);
+}
+
+constexpr auto constexpr_sort_descending_test() {
+  constexpr std::array v{3, 1, 4, 1, 5};
+  auto sorted = spl::apply(v, spl::to_vector(), spl::sort(std::greater<>{}));
+  int result = 0;
+  for (auto x : sorted) {
+    result = result * 10 + x;
+  }
+  return result;
+}
+
+TEST(SplTest, SortDescendingConstexpr) {
+  static_assert(constexpr_sort_descending_test() == 54311);  // 5,4,3,1,1
+  EXPECT_EQ(constexpr_sort_descending_test(), 54311);
+}
+
+constexpr auto constexpr_sort_with_filter_test() {
+  constexpr std::array v{5, 2, 8, 1, 9, 3, 7, 4, 6};
+  auto sorted = spl::apply(v,
+                          spl::filter([](int x) { return x % 2 == 0; }),
+                          spl::to_vector(),
+                          spl::sort());
+  int result = 0;
+  for (auto x : sorted) {
+    result = result * 10 + x;
+  }
+  return result;
+}
+
+TEST(SplTest, SortWithFilterConstexpr) {
+  static_assert(constexpr_sort_with_filter_test() == 2468);  // 2,4,6,8
+  EXPECT_EQ(constexpr_sort_with_filter_test(), 2468);
+}
+
+constexpr auto constexpr_sort_from_iota_test() {
+  auto sorted = spl::apply(spl::iota(1, 6),
+                          spl::to_vector(),
+                          spl::sort(std::greater<>{}));
+  int result = 0;
+  for (auto x : sorted) {
+    result = result * 10 + x;
+  }
+  return result;
+}
+
+TEST(SplTest, SortFromIotaConstexpr) {
+  static_assert(constexpr_sort_from_iota_test() == 54321);  // 5,4,3,2,1
+  EXPECT_EQ(constexpr_sort_from_iota_test(), 54321);
+}
+
+TEST(SplTest, SortBasic) {
+  std::vector<int> v{3, 1, 4, 1, 5, 9, 2, 6};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 1, 2, 3, 4, 5, 6, 9));
+}
+
+TEST(SplTest, SortDescending) {
+  std::vector<int> v{3, 1, 4, 1, 5, 9, 2, 6};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort(std::greater<>{}));
+
+  EXPECT_THAT(result, ElementsAre(9, 6, 5, 4, 3, 2, 1, 1));
+}
+
+TEST(SplTest, SortAlreadySorted) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, SortReverseSorted) {
+  std::vector<int> v{5, 4, 3, 2, 1};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, SortSingleElement) {
+  std::vector<int> v{42};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(42));
+}
+
+TEST(SplTest, SortEmpty) {
+  std::vector<int> v{};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, SortWithFilter) {
+  std::vector<int> v{5, 2, 8, 1, 9, 3, 7, 4, 6};
+
+  auto result = spl::apply(v,
+                          spl::filter([](int x) { return x % 2 == 0; }),
+                          spl::to_vector(),
+                          spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(2, 4, 6, 8));
+}
+
+TEST(SplTest, SortWithTransform) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+
+  auto result = spl::apply(v,
+                          spl::transform([](int x) { return x * 2; }),
+                          spl::to_vector(),
+                          spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(2, 2, 6, 8, 10));
+}
+
+TEST(SplTest, SortStrings) {
+  std::vector<std::string> v{"banana", "apple", "cherry", "date"};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_THAT(result, ElementsAre("apple", "banana", "cherry", "date"));
+}
+
+TEST(SplTest, SortStringsDescending) {
+  std::vector<std::string> v{"banana", "apple", "cherry", "date"};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort(std::greater<>{}));
+
+  EXPECT_THAT(result, ElementsAre("date", "cherry", "banana", "apple"));
+}
+
+TEST(SplTest, SortCustomComparator) {
+  std::vector<int> v{-3, 1, -4, 2, -5};
+
+  // Sort by absolute value
+  auto result = spl::apply(v, spl::to_vector(), spl::sort([](int a, int b) {
+    return std::abs(a) < std::abs(b);
+  }));
+
+  EXPECT_THAT(result, ElementsAre(1, 2, -3, -4, -5));
+}
+
+TEST(SplTest, SortWithChainBefore) {
+  std::array<int, 3> v1{5, 3, 1};
+  std::array<int, 2> v2{4, 2};
+
+  auto result = spl::apply(v1,
+                          spl::chain_before(v2),
+                          spl::to_vector(),
+                          spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, SortWithChainAfter) {
+  std::array<int, 3> v1{5, 3, 1};
+  std::array<int, 2> v2{4, 2};
+
+  auto result = spl::apply(v1,
+                          spl::chain_after(v2),
+                          spl::to_vector(),
+                          spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, SortFromIota) {
+  auto result = spl::apply(spl::iota(5, 10),
+                          spl::to_vector(),
+                          spl::sort(std::greater<>{}));
+
+  EXPECT_THAT(result, ElementsAre(9, 8, 7, 6, 5));
+}
+
+TEST(SplTest, SortWithTake) {
+  std::vector<int> v{9, 1, 8, 2, 7, 3, 6, 4, 5};
+
+  auto result = spl::apply(v,
+                          spl::take(5),
+                          spl::to_vector(),
+                          spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 7, 8, 9));
+}
+
+TEST(SplTest, SortThenTransform) {
+  std::vector<int> v{3, 1, 2};
+
+  auto result = spl::apply(v,
+                          spl::to_vector(),
+                          spl::sort(),
+                          spl::transform_complete([](auto&& sorted) {
+                            int sum = 0;
+                            for (auto x : sorted) sum += x;
+                            return sum;
+                          }));
+
+  EXPECT_EQ(result, 6);  // 1+2+3 = 6
+}
+
+TEST(SplTest, SortArray) {
+  std::array<int, 5> v{5, 2, 4, 1, 3};
+
+  auto result = spl::apply(v, spl::to_vector(), spl::sort());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
