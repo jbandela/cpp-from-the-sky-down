@@ -4,6 +4,7 @@
 #include "spl_core.h"
 #include <algorithm>
 #include <map>
+#include <optional>
 
 namespace spl {
 
@@ -28,6 +29,8 @@ template<typename F>
 constexpr auto for_each(F f);
 
 constexpr auto sum();
+
+inline constexpr auto first();
 
 // Transformation stages
 template<typename F>
@@ -763,6 +766,55 @@ constexpr auto chain_after(R&& r) {
                R,
                std::integral_constant<chain_position, chain_position::after>>(std::forward<R>(r));
 }
+
+template<typename... Types>
+struct types_to_tuple_impl{
+  using type = std::tuple<Types...>;
+};
+
+template<typename Type>
+struct types_to_tuple_impl<Type>{
+  using type = Type;
+};
+
+template<typename... Types>
+using types_to_tuple = typename types_to_tuple_impl<Types...>::type;
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes>
+struct first_impl;
+
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes>
+struct first_impl<StageProperties, types<InputTypes...>>
+    : stage_impl<first_impl<StageProperties, types<InputTypes...>>> {
+  using base = typename first_impl::base;
+  using output_type = std::optional<types_to_tuple<std::remove_cvref_t<InputTypes>...>>;
+  using output_types = types<output_type>;
+  output_type output_;
+
+  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
+    if(!output_){
+      output_.emplace(static_cast<InputTypes>(inputs)...);
+    }
+  }
+
+  constexpr bool done() const{
+    return output_.has_value();
+  }
+
+  constexpr decltype(auto) finish() {
+    return this->next.process_complete(std::move(output_));
+  }
+
+};
+
+inline constexpr auto first(){
+  return stage<first_impl, processing_style::incremental, processing_style::complete>();
 }
+
+}
+
 
 #endif //SKYDOWN_SPL_STAGES_H_

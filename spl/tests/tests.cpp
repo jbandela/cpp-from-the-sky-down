@@ -2094,3 +2094,34 @@ TEST(SplTest, SortArray) {
 
   EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
 }
+
+constexpr auto calculate_first() {
+  constexpr std::array v{1, 2, 3, 4};
+  auto t = spl::compose(
+      spl::filter([](int i) { return i %2 ==  0; }),
+      spl::first());
+  return spl::apply(v,
+                    std::move(t));
+
+}
+
+TEST(SplTest, FirstBasic){
+  static_assert(calculate_first() == 2);
+  EXPECT_EQ(calculate_first(), 2);
+}
+
+constexpr auto calculate_first_tuple() {
+  constexpr std::array v{1, 2, 3, 4};
+  auto t = spl::compose(
+      spl::filter([](int i) { return i %2 ==  0; }),
+      spl::zip_result([](auto a){return a/2;}),
+      spl::first());
+  return spl::apply(v,
+                    std::move(t));
+
+}
+
+TEST(SplTest, FirstBasicTuple){
+  static_assert(calculate_first_tuple() == std::tuple{2,1});
+  EXPECT_EQ(calculate_first_tuple(), (std::tuple{2,1}));
+}
