@@ -781,27 +781,27 @@ template<typename... Types>
 using types_to_tuple = typename types_to_tuple_impl<Types...>::type;
 
 // Forward declaration
-template<typename StageProperties, typename InputTypes>
-struct first_impl;
+template<typename StageProperties, typename InputTypes, typename Last>
+struct first_last_impl;
 
 
 // Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes>
-struct first_impl<StageProperties, types<InputTypes...>>
-    : stage_impl<first_impl<StageProperties, types<InputTypes...>>> {
-  using base = typename first_impl::base;
+template<typename StageProperties, typename... InputTypes, bool is_last>
+struct first_last_impl<StageProperties, types<InputTypes...>, std::integral_constant<bool,is_last>>
+    : stage_impl<first_last_impl<StageProperties, types<InputTypes...>,std::integral_constant<bool,is_last>>> {
+  using base = typename first_last_impl::base;
   using output_type = std::optional<types_to_tuple<std::remove_cvref_t<InputTypes>...>>;
   using output_types = types<output_type>;
   output_type output_;
 
   constexpr decltype(auto) process_incremental(InputTypes... inputs) {
-    if(!output_){
+    if(is_last || !output_){
       output_.emplace(static_cast<InputTypes>(inputs)...);
     }
   }
 
   constexpr bool done() const{
-    return output_.has_value();
+    return (!is_last && output_.has_value()) || this->next.done();
   }
 
   constexpr decltype(auto) finish() {
@@ -811,7 +811,11 @@ struct first_impl<StageProperties, types<InputTypes...>>
 };
 
 inline constexpr auto first(){
-  return stage<first_impl, processing_style::incremental, processing_style::complete>();
+  return stage<first_last_impl, processing_style::incremental, processing_style::complete, std::integral_constant<bool,false>>();
+}
+
+inline constexpr auto last(){
+  return stage<first_last_impl, processing_style::incremental, processing_style::complete, std::integral_constant<bool,true>>();
 }
 
 }

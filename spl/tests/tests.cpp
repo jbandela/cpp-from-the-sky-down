@@ -2125,3 +2125,34 @@ TEST(SplTest, FirstBasicTuple){
   static_assert(calculate_first_tuple() == std::tuple{2,1});
   EXPECT_EQ(calculate_first_tuple(), (std::tuple{2,1}));
 }
+
+constexpr auto calculate_last() {
+  constexpr std::array v{1, 2, 3, 4};
+  auto t = spl::compose(
+      spl::filter([](int i) { return i %2 ==  0; }),
+      spl::last());
+  return spl::apply(v,
+                    std::move(t));
+
+}
+
+TEST(SplTest, LastBasic){
+  static_assert(calculate_last() == 4);
+  EXPECT_EQ(calculate_last(), 4);
+}
+
+constexpr auto calculate_last_tuple() {
+  constexpr std::array v{1, 2, 3, 4};
+  auto t = spl::compose(
+      spl::filter([](int i) { return i %2 ==  0; }),
+      spl::zip_result([](auto a){return a/2;}),
+      spl::last());
+  return spl::apply(v,
+                    std::move(t));
+
+}
+
+TEST(SplTest, LastBasicTuple){
+  static_assert(calculate_last_tuple() == std::tuple{4,2});
+  EXPECT_EQ(calculate_last_tuple(), (std::tuple{4,2}));
+}
