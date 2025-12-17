@@ -31,6 +31,7 @@ constexpr auto for_each(F f);
 constexpr auto sum();
 
 inline constexpr auto first();
+inline constexpr auto last();
 
 // Transformation stages
 template<typename F>
@@ -768,54 +769,28 @@ constexpr auto chain_after(R&& r) {
 }
 
 template<typename... Types>
-struct types_to_tuple_impl{
+struct single_type_or_tuple{
   using type = std::tuple<Types...>;
 };
 
 template<typename Type>
-struct types_to_tuple_impl<Type>{
+struct single_type_or_tuple<Type>{
   using type = Type;
 };
 
 template<typename... Types>
-using types_to_tuple = typename types_to_tuple_impl<Types...>::type;
+using single_type_or_tuple_t = typename single_type_or_tuple<Types...>::type;
 
-// Forward declaration
-template<typename StageProperties, typename InputTypes, typename Last>
-struct first_last_impl;
-
-
-// Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes, bool is_last>
-struct first_last_impl<StageProperties, types<InputTypes...>, std::integral_constant<bool,is_last>>
-    : stage_impl<first_last_impl<StageProperties, types<InputTypes...>,std::integral_constant<bool,is_last>>> {
-  using base = typename first_last_impl::base;
-  using output_type = std::optional<types_to_tuple<std::remove_cvref_t<InputTypes>...>>;
-  using output_types = types<output_type>;
-  output_type output_;
-
-  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
-    if(is_last || !output_){
-      output_.emplace(static_cast<InputTypes>(inputs)...);
-    }
-  }
-
-  constexpr bool done() const{
-    return (!is_last && output_.has_value()) || this->next.done();
-  }
-
-  constexpr decltype(auto) finish() {
-    return this->next.process_complete(std::move(output_));
-  }
-
-};
-
-inline constexpr auto first(){
-  return stage<first_last_impl, processing_style::incremental, processing_style::complete, std::integral_constant<bool,false>>();
+constexpr inline auto last(){
+  return accumulate_in_place([]<typename... InputTypes>(types<InputTypes...>) {
+    return types<std::optional<single_type_or_tuple_t<std::remove_cvref_t<InputTypes>...>>>();
+ }, [](auto &acc, auto &&... args) {
+    acc.emplace(std::forward<decltype(args)>(args)...);
+  });
 }
 
-inline constexpr auto last(){
-  return stage<first_last_impl, processing_style::incremental, processing_style::complete, std::integral_constant<bool,true>>();
+constexpr inline auto first(){
+  return compose(take(1),last());
 }
 
 }
