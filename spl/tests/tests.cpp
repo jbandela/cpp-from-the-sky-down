@@ -2285,3 +2285,345 @@ TEST(SplTest, LastBasicTuple){
   static_assert(calculate_last_tuple() == std::tuple{4,2});
   EXPECT_EQ(calculate_last_tuple(), (std::tuple{4,2}));
 }
+
+// Additional first tests
+constexpr auto constexpr_first_simple_test() {
+  constexpr std::array v{10, 20, 30, 40, 50};
+  return spl::apply(v, spl::first());
+}
+
+TEST(SplTest, FirstSimple) {
+  static_assert(constexpr_first_simple_test() == 10);
+  EXPECT_EQ(constexpr_first_simple_test(), 10);
+}
+
+constexpr auto constexpr_first_single_element_test() {
+  constexpr std::array v{42};
+  return spl::apply(v, spl::first());
+}
+
+TEST(SplTest, FirstSingleElement) {
+  static_assert(constexpr_first_single_element_test() == 42);
+  EXPECT_EQ(constexpr_first_single_element_test(), 42);
+}
+
+TEST(SplTest, FirstWithVector) {
+  std::vector<int> v{5, 10, 15, 20};
+  auto result = spl::apply(v, spl::first());
+  EXPECT_EQ(result, 5);
+}
+
+constexpr auto constexpr_first_with_transform_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return x * 10; }),
+                   spl::first());
+}
+
+TEST(SplTest, FirstWithTransform) {
+  static_assert(constexpr_first_with_transform_test() == 10);
+  EXPECT_EQ(constexpr_first_with_transform_test(), 10);
+}
+
+constexpr auto constexpr_first_with_filter_none_match_test() {
+  constexpr std::array v{1, 3, 5, 7, 9};
+  return spl::apply(v,
+                   spl::filter([](int x) { return x % 2 == 0; }),
+                   spl::first());
+}
+
+TEST(SplTest, FirstWithFilterNoneMatch) {
+  static_assert(!constexpr_first_with_filter_none_match_test().has_value());
+  EXPECT_FALSE(constexpr_first_with_filter_none_match_test().has_value());
+}
+
+constexpr auto constexpr_first_from_iota_test() {
+  return spl::apply(spl::iota(100, 200), spl::first());
+}
+
+TEST(SplTest, FirstFromIota) {
+  static_assert(constexpr_first_from_iota_test() == 100);
+  EXPECT_EQ(constexpr_first_from_iota_test(), 100);
+}
+
+constexpr auto constexpr_first_with_flatten_test() {
+  constexpr std::array<std::array<int, 3>, 2> v{{{10, 20, 30}, {40, 50, 60}}};
+  return spl::apply(v, spl::flatten(), spl::first());
+}
+
+TEST(SplTest, FirstWithFlatten) {
+  static_assert(constexpr_first_with_flatten_test() == 10);
+  EXPECT_EQ(constexpr_first_with_flatten_test(), 10);
+}
+
+constexpr auto constexpr_first_with_zip_test() {
+  constexpr std::array<int, 3> v1{1, 2, 3};
+  constexpr std::array<int, 3> v2{10, 20, 30};
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::transform([](int a, int b) { return a + b; }),
+                   spl::first());
+}
+
+TEST(SplTest, FirstWithZip) {
+  static_assert(constexpr_first_with_zip_test() == 11);  // 1 + 10
+  EXPECT_EQ(constexpr_first_with_zip_test(), 11);
+}
+
+TEST(SplTest, FirstWithStrings) {
+  std::vector<std::string> v{"hello", "world", "test"};
+  auto result = spl::apply(v, spl::first());
+  EXPECT_EQ(result, "hello");
+}
+
+constexpr auto constexpr_first_with_take_test() {
+  constexpr std::array v{100, 200, 300, 400, 500};
+  return spl::apply(v, spl::take(3), spl::first());
+}
+
+TEST(SplTest, FirstWithTake) {
+  static_assert(constexpr_first_with_take_test() == 100);
+  EXPECT_EQ(constexpr_first_with_take_test(), 100);
+}
+
+// Additional last tests
+constexpr auto constexpr_last_simple_test() {
+  constexpr std::array v{10, 20, 30, 40, 50};
+  return spl::apply(v, spl::last());
+}
+
+TEST(SplTest, LastSimple) {
+  static_assert(constexpr_last_simple_test() == 50);
+  EXPECT_EQ(constexpr_last_simple_test(), 50);
+}
+
+constexpr auto constexpr_last_single_element_test() {
+  constexpr std::array v{42};
+  return spl::apply(v, spl::last());
+}
+
+TEST(SplTest, LastSingleElement) {
+  static_assert(constexpr_last_single_element_test() == 42);
+  EXPECT_EQ(constexpr_last_single_element_test(), 42);
+}
+
+TEST(SplTest, LastWithVector) {
+  std::vector<int> v{5, 10, 15, 20};
+  auto result = spl::apply(v, spl::last());
+  EXPECT_EQ(result, 20);
+}
+
+constexpr auto constexpr_last_with_transform_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return x * 10; }),
+                   spl::last());
+}
+
+TEST(SplTest, LastWithTransform) {
+  static_assert(constexpr_last_with_transform_test() == 50);
+  EXPECT_EQ(constexpr_last_with_transform_test(), 50);
+}
+
+constexpr auto constexpr_last_with_filter_none_match_test() {
+  constexpr std::array v{1, 3, 5, 7, 9};
+  return spl::apply(v,
+                   spl::filter([](int x) { return x % 2 == 0; }),
+                   spl::last());
+}
+
+TEST(SplTest, LastWithFilterNoneMatch) {
+  static_assert(!constexpr_last_with_filter_none_match_test().has_value());
+  EXPECT_FALSE(constexpr_last_with_filter_none_match_test().has_value());
+}
+
+constexpr auto constexpr_last_from_iota_test() {
+  return spl::apply(spl::iota(100, 105), spl::last());
+}
+
+TEST(SplTest, LastFromIota) {
+  static_assert(constexpr_last_from_iota_test() == 104);
+  EXPECT_EQ(constexpr_last_from_iota_test(), 104);
+}
+
+constexpr auto constexpr_last_with_flatten_test() {
+  constexpr std::array<std::array<int, 3>, 2> v{{{10, 20, 30}, {40, 50, 60}}};
+  return spl::apply(v, spl::flatten(), spl::last());
+}
+
+TEST(SplTest, LastWithFlatten) {
+  static_assert(constexpr_last_with_flatten_test() == 60);
+  EXPECT_EQ(constexpr_last_with_flatten_test(), 60);
+}
+
+constexpr auto constexpr_last_with_zip_test() {
+  constexpr std::array<int, 3> v1{1, 2, 3};
+  constexpr std::array<int, 3> v2{10, 20, 30};
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::transform([](int a, int b) { return a + b; }),
+                   spl::last());
+}
+
+TEST(SplTest, LastWithZip) {
+  static_assert(constexpr_last_with_zip_test() == 33);  // 3 + 30
+  EXPECT_EQ(constexpr_last_with_zip_test(), 33);
+}
+
+TEST(SplTest, LastWithStrings) {
+  std::vector<std::string> v{"hello", "world", "test"};
+  auto result = spl::apply(v, spl::last());
+  EXPECT_EQ(result, "test");
+}
+
+constexpr auto constexpr_last_with_take_test() {
+  constexpr std::array v{100, 200, 300, 400, 500};
+  return spl::apply(v, spl::take(3), spl::last());
+}
+
+TEST(SplTest, LastWithTake) {
+  static_assert(constexpr_last_with_take_test() == 300);
+  EXPECT_EQ(constexpr_last_with_take_test(), 300);
+}
+
+constexpr auto constexpr_last_with_chain_before_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{1, 2};
+  return spl::apply(v1, spl::chain_before(v2), spl::last());
+}
+
+TEST(SplTest, LastWithChainBefore) {
+  static_assert(constexpr_last_with_chain_before_test() == 30);
+  EXPECT_EQ(constexpr_last_with_chain_before_test(), 30);
+}
+
+constexpr auto constexpr_last_with_chain_after_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{100, 200};
+  return spl::apply(v1, spl::chain_after(v2), spl::last());
+}
+
+TEST(SplTest, LastWithChainAfter) {
+  static_assert(constexpr_last_with_chain_after_test() == 200);
+  EXPECT_EQ(constexpr_last_with_chain_after_test(), 200);
+}
+
+constexpr auto constexpr_first_with_chain_before_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{1, 2};
+  return spl::apply(v1, spl::chain_before(v2), spl::first());
+}
+
+TEST(SplTest, FirstWithChainBefore) {
+  static_assert(constexpr_first_with_chain_before_test() == 1);
+  EXPECT_EQ(constexpr_first_with_chain_before_test(), 1);
+}
+
+constexpr auto constexpr_first_with_chain_after_test() {
+  constexpr std::array<int, 3> v1{10, 20, 30};
+  constexpr std::array<int, 2> v2{100, 200};
+  return spl::apply(v1, spl::chain_after(v2), spl::first());
+}
+
+TEST(SplTest, FirstWithChainAfter) {
+  static_assert(constexpr_first_with_chain_after_test() == 10);
+  EXPECT_EQ(constexpr_first_with_chain_after_test(), 10);
+}
+
+// Tests for first/last with multi-argument pipelines
+constexpr auto constexpr_first_multi_arg_test() {
+  constexpr std::array<std::pair<int, int>, 3> v{{{1, 10}, {2, 20}, {3, 30}}};
+  return spl::apply(v,
+                   spl::expand_tuple(),
+                   spl::first());
+}
+
+TEST(SplTest, FirstMultiArg) {
+  static_assert(constexpr_first_multi_arg_test() == std::tuple{1, 10});
+  EXPECT_EQ(constexpr_first_multi_arg_test(), (std::tuple{1, 10}));
+}
+
+constexpr auto constexpr_last_multi_arg_test() {
+  constexpr std::array<std::pair<int, int>, 3> v{{{1, 10}, {2, 20}, {3, 30}}};
+  return spl::apply(v,
+                   spl::expand_tuple(),
+                   spl::last());
+}
+
+TEST(SplTest, LastMultiArg) {
+  static_assert(constexpr_last_multi_arg_test() == std::tuple{3, 30});
+  EXPECT_EQ(constexpr_last_multi_arg_test(), (std::tuple{3, 30}));
+}
+
+// Test first and last together using tee
+constexpr auto constexpr_first_last_tee_test() {
+  constexpr std::array v{5, 10, 15, 20, 25};
+  return spl::apply(v,
+                   spl::tee(spl::first(), spl::last()));
+}
+
+TEST(SplTest, FirstLastWithTee) {
+  constexpr auto result = constexpr_first_last_tee_test();
+  static_assert(std::get<0>(result) == 5);
+  static_assert(std::get<1>(result) == 25);
+  EXPECT_EQ(std::get<0>(result), 5);
+  EXPECT_EQ(std::get<1>(result), 25);
+}
+
+// Test first/last with generator
+TEST(SplTest, FirstWithGenerator) {
+  auto gen = spl::generator([i = 10](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i >= 15) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen), spl::first());
+  EXPECT_EQ(result, 10);
+}
+
+TEST(SplTest, LastWithGenerator) {
+  auto gen = spl::generator([i = 10](auto &&out) mutable {
+    if constexpr (spl::calculate_type_v<decltype(out)>) {
+      return out(int(i));
+    } else {
+      if (i >= 15) return false;
+      out(i++);
+      return true;
+    }
+  });
+
+  auto result = spl::apply(std::move(gen), spl::last());
+  EXPECT_EQ(result, 14);
+}
+
+// Test first/last with swizzle
+constexpr auto constexpr_first_with_swizzle_test() {
+  constexpr std::array<std::tuple<int, int, int>, 3> v{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}};
+  return spl::apply(v,
+                   spl::expand_tuple(),
+                   spl::swizzle<2, 0>(),
+                   spl::first());
+}
+
+TEST(SplTest, FirstWithSwizzle) {
+  static_assert(constexpr_first_with_swizzle_test() == std::tuple{3, 1});
+  EXPECT_EQ(constexpr_first_with_swizzle_test(), (std::tuple{3, 1}));
+}
+
+constexpr auto constexpr_last_with_swizzle_test() {
+  constexpr std::array<std::tuple<int, int, int>, 3> v{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}};
+  return spl::apply(v,
+                   spl::expand_tuple(),
+                   spl::swizzle<2, 0>(),
+                   spl::last());
+}
+
+TEST(SplTest, LastWithSwizzle) {
+  static_assert(constexpr_last_with_swizzle_test() == std::tuple{9, 7});
+  EXPECT_EQ(constexpr_last_with_swizzle_test(), (std::tuple{9, 7}));
+}
