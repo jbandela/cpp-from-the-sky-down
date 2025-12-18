@@ -1548,6 +1548,135 @@ TEST(SplTest, ZipStringValues) {
   EXPECT_THAT(result, ElementsAre("hello1", "world2", "test3"));
 }
 
+constexpr auto constexpr_zip_with_filter_test() {
+  constexpr std::array<int, 5> v1{1, 2, 3, 4, 5};
+  constexpr std::array<int, 5> v2{10, 20, 30, 40, 50};
+
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::filter([](int a, int b) { return a % 2 == 0; }),
+                   spl::transform([](int a, int b) { return a + b; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipWithFilterConstexpr) {
+  static_assert(constexpr_zip_with_filter_test() == 66);  // (2+20) + (4+40) = 22 + 44 = 66
+  EXPECT_EQ(constexpr_zip_with_filter_test(), 66);
+}
+
+constexpr auto constexpr_zip_with_take_test() {
+  constexpr std::array<int, 10> v1{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  constexpr std::array<int, 10> v2{10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::take(3),
+                   spl::transform([](int a, int b) { return a * b; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipWithTakeConstexpr) {
+  static_assert(constexpr_zip_with_take_test() == 140);  // 1*10 + 2*20 + 3*30 = 10 + 40 + 90 = 140
+  EXPECT_EQ(constexpr_zip_with_take_test(), 140);
+}
+
+constexpr auto constexpr_zip_nested_test() {
+  constexpr std::array<int, 3> v1{1, 2, 3};
+  constexpr std::array<int, 3> v2{10, 20, 30};
+  constexpr std::array<int, 3> v3{100, 200, 300};
+
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::zip(v3),
+                   spl::transform([](int a, int b, int c) { return a + b + c; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipNestedConstexpr) {
+  static_assert(constexpr_zip_nested_test() == 666);  // (1+10+100)+(2+20+200)+(3+30+300) = 111+222+333 = 666
+  EXPECT_EQ(constexpr_zip_nested_test(), 666);
+}
+
+constexpr auto constexpr_zip_with_swizzle_test() {
+  constexpr std::array<int, 3> v1{1, 2, 3};
+  constexpr std::array<int, 3> v2{10, 20, 30};
+
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::swizzle<1, 0>(),  // swap order: (b, a)
+                   spl::transform([](int b, int a) { return b - a; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipWithSwizzleConstexpr) {
+  static_assert(constexpr_zip_with_swizzle_test() == 54);  // (10-1)+(20-2)+(30-3) = 9+18+27 = 54
+  EXPECT_EQ(constexpr_zip_with_swizzle_test(), 54);
+}
+
+constexpr auto constexpr_zip_three_ranges_test() {
+  constexpr std::array<int, 4> v1{1, 2, 3, 4};
+  constexpr std::array<int, 4> v2{10, 20, 30, 40};
+  constexpr std::array<int, 4> v3{100, 200, 300, 400};
+
+  return spl::apply(v1,
+                   spl::zip(v2, v3),
+                   spl::transform([](int a, int b, int c) { return a + b + c; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipThreeRangesConstexpr) {
+  static_assert(constexpr_zip_three_ranges_test() == 1110);  // (1+10+100)+...+(4+40+400) = 111+222+333+444 = 1110
+  EXPECT_EQ(constexpr_zip_three_ranges_test(), 1110);
+}
+
+constexpr auto constexpr_zip_with_tee_test() {
+  constexpr std::array<int, 3> v1{1, 2, 3};
+  constexpr std::array<int, 3> v2{10, 20, 30};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::tee(
+                              spl::compose(spl::transform([](int a, int b) { return a; }), spl::sum()),
+                              spl::compose(spl::transform([](int a, int b) { return b; }), spl::sum())
+                          ));
+  return std::get<0>(result) + std::get<1>(result);
+}
+
+TEST(SplTest, ZipWithTeeConstexpr) {
+  static_assert(constexpr_zip_with_tee_test() == 66);  // (1+2+3) + (10+20+30) = 6 + 60 = 66
+  EXPECT_EQ(constexpr_zip_with_tee_test(), 66);
+}
+
+TEST(SplTest, ZipWithSort) {
+  std::array<int, 4> v1{3, 1, 4, 2};
+  std::array<int, 4> v2{30, 10, 40, 20};
+
+  auto result = spl::apply(v1,
+                          spl::zip(v2),
+                          spl::make_pair(),
+                          spl::to_vector(),
+                          spl::sort([](const auto& a, const auto& b) {
+                            return a.first < b.first;
+                          }));
+
+  EXPECT_THAT(result, ElementsAre(Pair(1, 10), Pair(2, 20), Pair(3, 30), Pair(4, 40)));
+}
+
+constexpr auto constexpr_zip_product_test() {
+  constexpr std::array<int, 4> v1{1, 2, 3, 4};
+  constexpr std::array<int, 4> v2{4, 3, 2, 1};
+
+  return spl::apply(v1,
+                   spl::zip(v2),
+                   spl::transform([](int a, int b) { return a * b; }),
+                   spl::sum());
+}
+
+TEST(SplTest, ZipDotProductConstexpr) {
+  static_assert(constexpr_zip_product_test() == 20);  // 1*4 + 2*3 + 3*2 + 4*1 = 4+6+6+4 = 20
+  EXPECT_EQ(constexpr_zip_product_test(), 20);
+}
+
 // chain_before and chain_after tests
 TEST(SplTest, ChainBeforeBasic) {
   std::array<int, 3> v1{1, 2, 3};
