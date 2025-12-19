@@ -3316,3 +3316,31 @@ TEST(SplTest, CountWithFlatten) {
   EXPECT_EQ(result, 6);
 }
 
+constexpr auto constexpr_unwrap_test_all_succeed() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  constexpr auto result =  spl::apply(v,spl::transform([](auto c){return std::make_optional(c);}),spl::unwrap(), spl::count());
+  static_assert(result);
+  static_assert(*result == 5);
+  return result;
+}
+
+TEST(SplTest, UnwrappAllTestAllSucceed) {
+  auto result = constexpr_unwrap_test_all_succeed();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(*result, 5);
+}
+
+constexpr auto constexpr_unwrap_test_some_fail() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  constexpr auto result =  spl::apply(v,
+    spl::transform([](auto c)->std::optional<int>{if(c == 3) {return std::nullopt;} else {  return std::make_optional(c);}}),
+    spl::unwrap(), spl::count());
+  static_assert(!result);
+  return result;
+}
+
+TEST(SplTest, UnwrappSomeFail) {
+  auto result = constexpr_unwrap_test_some_fail();
+  EXPECT_FALSE(result);
+}
+

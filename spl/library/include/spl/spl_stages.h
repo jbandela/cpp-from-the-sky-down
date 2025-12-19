@@ -972,6 +972,126 @@ constexpr auto push_back_into(C& c){
 }
 
 
+// Forward declaration
+template<typename StageProperties, typename InputTypes>
+struct unwrap_impl;
+
+template<typename T>
+struct is_optional_impl:std::false_type{};
+
+template<typename T>
+struct is_optional_impl<std::optional<T>>:std::true_type{};
+
+template<typename T>
+concept is_optional = is_optional_impl<std::remove_cvref_t<T>>::value;
+
+template<typename T>
+struct unwrapper_impl;
+
+template<typename T>
+struct unwrapper_impl<std::optional<T>>{
+
+// We can't use nullopt_t as the error type since that will be stored in unwrap_impl as an optional.
+ using error_type = bool;
+
+  template<is_optional U>
+  static constexpr decltype(auto) unwrap(U&& v){
+    return *std::forward<U>(v);
+  }
+  
+  template<is_optional U>
+  static constexpr bool has_error(U&& v){
+    return !v.has_value();
+  }
+
+  template<is_optional U>
+  static constexpr error_type get_error(U&&){
+    return true;
+  }
+
+  template<is_optional U>
+  static constexpr auto wrap_error(types<U>, error_type){
+    return std::remove_cvref_t<U>(std::nullopt);
+  }
+
+  template<typename U>
+  static constexpr auto wrap_error(types<U>, error_type){
+    return std::optional<std::remove_cvref_t<U>>(std::nullopt);
+  }
+
+
+  template<is_optional U>
+  static constexpr decltype(auto) wrap_success(U&& v){
+    return std::forward<U>(v);
+  }
+
+  template<typename U>
+  static constexpr std::optional<std::remove_cvref_t<U>> wrap_success(U&& u){
+    return std::optional<std::remove_cvref_t<T>>(std::forward<U>(u)); 
+  }
+
+  
+
+ 
+
+
+};
+
+
+
+
+
+
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes>
+struct unwrap_impl<StageProperties,
+                     types<InputTypes...>>
+    : stage_impl<unwrap_impl<StageProperties,
+                               types<InputTypes...>>> {
+  using base = typename unwrap_impl::base;
+  using output_types = types<InputTypes...>;
+  static_assert(sizeof...(InputTypes) == 1, "cannot unwrap more than one input");
+  static_assert(is_types<output_types>::value);
+  using unwrapper = unwrapper_impl<std::remove_cvref_t<InputTypes>...>;
+
+  std::optional<typename unwrapper::error_type> error;
+  bool done_ = false;
+
+
+
+
+  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
+    if(unwrapper::has_error(std::as_const(inputs)...)){
+      done_ = true;
+      error = unwrapper::get_error(std::as_const(inputs)...);
+    } else{
+      this->next.process_incremental(unwrapper::unwrap(static_cast<InputTypes>(inputs)...));
+    }
+  }
+
+  constexpr decltype(auto) finish() {
+    if(error.has_value()){
+      return unwrapper::wrap_error(types<decltype(this->next.finish())>(),*std::move(error));
+    }else{
+      return unwrapper::wrap_success(this->next.finish());
+    }
+
+  }
+
+  constexpr bool done() const {
+    return done_ || this->next.done();
+  }
+
+};
+
+inline constexpr auto unwrap(){
+  return stage<unwrap_impl,
+               processing_style::incremental,
+               processing_style::incremental>();
+}
+
+
 }
 
 
