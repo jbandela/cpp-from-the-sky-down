@@ -30,6 +30,8 @@ constexpr auto for_each(F f);
 
 constexpr auto sum();
 
+constexpr auto count();
+
 inline constexpr auto first();
 inline constexpr auto last();
 
@@ -244,6 +246,10 @@ constexpr auto for_each(F f) {
 }
 constexpr auto sum() {
   return accumulate(std::plus<>{});
+}
+
+constexpr auto count() {
+  return accumulate_in_place(size_t{0}, [](size_t& c, auto&&...) { ++c; });
 }
 
 // Forward declaration

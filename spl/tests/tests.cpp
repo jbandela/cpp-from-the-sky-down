@@ -3240,3 +3240,79 @@ TEST(SplTest, PushBackIntoWithTake) {
   EXPECT_THAT(result, ElementsAre(1, 2, 3));
 }
 
+// count tests
+constexpr auto constexpr_count_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v, spl::count());
+}
+
+TEST(SplTest, CountBasic) {
+  static_assert(constexpr_count_test() == 5);
+  EXPECT_EQ(constexpr_count_test(), 5);
+}
+
+constexpr auto constexpr_count_empty_test() {
+  constexpr std::array<int, 0> v{};
+  return spl::apply(v, spl::count());
+}
+
+TEST(SplTest, CountEmpty) {
+  static_assert(constexpr_count_empty_test() == 0);
+  EXPECT_EQ(constexpr_count_empty_test(), 0);
+}
+
+constexpr auto constexpr_count_with_filter_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  return spl::apply(v,
+                   spl::filter([](int x) { return x % 2 == 0; }),
+                   spl::count());
+}
+
+TEST(SplTest, CountWithFilter) {
+  static_assert(constexpr_count_with_filter_test() == 5);
+  EXPECT_EQ(constexpr_count_with_filter_test(), 5);
+}
+
+constexpr auto constexpr_count_with_take_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  return spl::apply(v, spl::take(3), spl::count());
+}
+
+TEST(SplTest, CountWithTake) {
+  static_assert(constexpr_count_with_take_test() == 3);
+  EXPECT_EQ(constexpr_count_with_take_test(), 3);
+}
+
+constexpr auto constexpr_count_from_iota_test() {
+  return spl::apply(spl::iota(0, 100), spl::count());
+}
+
+TEST(SplTest, CountFromIota) {
+  static_assert(constexpr_count_from_iota_test() == 100);
+  EXPECT_EQ(constexpr_count_from_iota_test(), 100);
+}
+
+constexpr auto constexpr_count_single_element_test() {
+  constexpr std::array v{42};
+  return spl::apply(v, spl::count());
+}
+
+TEST(SplTest, CountSingleElement) {
+  static_assert(constexpr_count_single_element_test() == 1);
+  EXPECT_EQ(constexpr_count_single_element_test(), 1);
+}
+
+TEST(SplTest, CountWithTransform) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v,
+                          spl::transform([](int x) { return x * 2; }),
+                          spl::count());
+  EXPECT_EQ(result, 5);
+}
+
+TEST(SplTest, CountWithFlatten) {
+  std::vector<std::vector<int>> v{{1, 2}, {3, 4, 5}, {6}};
+  auto result = spl::apply(v, spl::flatten(), spl::count());
+  EXPECT_EQ(result, 6);
+}
+
