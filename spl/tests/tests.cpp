@@ -2755,3 +2755,141 @@ TEST(SplTest, AnyOfFromIota) {
   EXPECT_TRUE(constexpr_any_of_from_iota_test());
 }
 
+// none_of tests
+constexpr auto constexpr_none_of_true_test() {
+  constexpr std::array v{1, 3, 5, 7, 9};
+  return spl::apply(v, spl::none_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, NoneOfTrue) {
+  static_assert(constexpr_none_of_true_test() == true);
+  EXPECT_TRUE(constexpr_none_of_true_test());
+}
+
+constexpr auto constexpr_none_of_false_test() {
+  constexpr std::array v{1, 3, 5, 6, 9};
+  return spl::apply(v, spl::none_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, NoneOfFalse) {
+  static_assert(constexpr_none_of_false_test() == false);
+  EXPECT_FALSE(constexpr_none_of_false_test());
+}
+
+constexpr auto constexpr_none_of_empty_test() {
+  constexpr std::array<int, 0> v{};
+  return spl::apply(v, spl::none_of([](int x) { return x > 0; }));
+}
+
+TEST(SplTest, NoneOfEmpty) {
+  static_assert(constexpr_none_of_empty_test() == true);
+  EXPECT_TRUE(constexpr_none_of_empty_test());
+}
+
+constexpr auto constexpr_none_of_with_filter_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  return spl::apply(v,
+                   spl::filter([](int x) { return x > 5; }),
+                   spl::none_of([](int x) { return x < 0; }));
+}
+
+TEST(SplTest, NoneOfWithFilter) {
+  static_assert(constexpr_none_of_with_filter_test() == true);
+  EXPECT_TRUE(constexpr_none_of_with_filter_test());
+}
+
+constexpr auto constexpr_none_of_from_iota_test() {
+  return spl::apply(spl::iota(1, 10),
+                   spl::none_of([](int x) { return x > 100; }));
+}
+
+TEST(SplTest, NoneOfFromIota) {
+  static_assert(constexpr_none_of_from_iota_test() == true);
+  EXPECT_TRUE(constexpr_none_of_from_iota_test());
+}
+
+// all_of tests
+constexpr auto constexpr_all_of_true_test() {
+  constexpr std::array v{2, 4, 6, 8, 10};
+  return spl::apply(v, spl::all_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, AllOfTrue) {
+  static_assert(constexpr_all_of_true_test() == true);
+  EXPECT_TRUE(constexpr_all_of_true_test());
+}
+
+constexpr auto constexpr_all_of_false_test() {
+  constexpr std::array v{2, 4, 5, 8, 10};
+  return spl::apply(v, spl::all_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, AllOfFalse) {
+  static_assert(constexpr_all_of_false_test() == false);
+  EXPECT_FALSE(constexpr_all_of_false_test());
+}
+
+constexpr auto constexpr_all_of_empty_test() {
+  constexpr std::array<int, 0> v{};
+  return spl::apply(v, spl::all_of([](int x) { return x > 0; }));
+}
+
+TEST(SplTest, AllOfEmpty) {
+  static_assert(constexpr_all_of_empty_test() == true);
+  EXPECT_TRUE(constexpr_all_of_empty_test());
+}
+
+constexpr auto constexpr_all_of_single_true_test() {
+  constexpr std::array v{42};
+  return spl::apply(v, spl::all_of([](int x) { return x > 0; }));
+}
+
+TEST(SplTest, AllOfSingleTrue) {
+  static_assert(constexpr_all_of_single_true_test() == true);
+  EXPECT_TRUE(constexpr_all_of_single_true_test());
+}
+
+constexpr auto constexpr_all_of_single_false_test() {
+  constexpr std::array v{-1};
+  return spl::apply(v, spl::all_of([](int x) { return x > 0; }));
+}
+
+TEST(SplTest, AllOfSingleFalse) {
+  static_assert(constexpr_all_of_single_false_test() == false);
+  EXPECT_FALSE(constexpr_all_of_single_false_test());
+}
+
+constexpr auto constexpr_all_of_with_filter_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  return spl::apply(v,
+                   spl::filter([](int x) { return x > 5; }),
+                   spl::all_of([](int x) { return x > 5; }));
+}
+
+TEST(SplTest, AllOfWithFilter) {
+  static_assert(constexpr_all_of_with_filter_test() == true);
+  EXPECT_TRUE(constexpr_all_of_with_filter_test());
+}
+
+constexpr auto constexpr_all_of_with_transform_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return x * 10; }),
+                   spl::all_of([](int x) { return x >= 10; }));
+}
+
+TEST(SplTest, AllOfWithTransform) {
+  static_assert(constexpr_all_of_with_transform_test() == true);
+  EXPECT_TRUE(constexpr_all_of_with_transform_test());
+}
+
+constexpr auto constexpr_all_of_from_iota_test() {
+  return spl::apply(spl::iota(1, 10),
+                   spl::all_of([](int x) { return x > 0; }));
+}
+
+TEST(SplTest, AllOfFromIota) {
+  static_assert(constexpr_all_of_from_iota_test() == true);
+  EXPECT_TRUE(constexpr_all_of_from_iota_test());
+}
+

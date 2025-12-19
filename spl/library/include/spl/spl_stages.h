@@ -865,8 +865,19 @@ constexpr inline auto any_of(Predicate pred){
 );
 }
 
+template<typename Predicate>
+constexpr inline auto none_of(Predicate pred){
+  return spl::compose(spl::any_of(std::move(pred)),
+  spl::transform_complete([](bool v){return !v;})
+);
+}
 
-
+template<typename Predicate>
+constexpr inline auto all_of(Predicate pred){
+  return spl::none_of([pred = std::move(pred)](auto&&... args){
+    return !pred(std::forward<decltype(args)>(args)...);
+  });
+}
 
 
 }
