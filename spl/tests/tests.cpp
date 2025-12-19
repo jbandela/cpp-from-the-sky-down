@@ -2653,3 +2653,20 @@ TEST(SplTest, Min) {
   EXPECT_EQ(constexpr_min_test(), 1);
 
 }
+
+constexpr auto constexpr_minmax_test() {
+  constexpr std::array v{3, 1, 4, 1, 5, 9, 2, 6};
+  constexpr auto result = spl::apply(v, spl::minmax());
+  static_assert(result);
+  static_assert(result->first == 1);
+  static_assert(result->second == 9);
+  return result;
+}
+
+TEST(SplTest, MinMax) {
+  constexpr auto result = constexpr_minmax_test();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(result->first, 1);
+  EXPECT_EQ(result->second, 9);
+}
+

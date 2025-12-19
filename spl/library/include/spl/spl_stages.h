@@ -835,6 +835,23 @@ constexpr inline auto max(){
  return max(std::less<>{});
 }
 
+template<typename Comp>
+constexpr auto minmax(Comp comp){
+  return spl::compose(spl::tee(min(comp),max(comp)),
+  spl::transform_complete([]<typename T, typename U>(std::optional<T> a,std::optional<U> b){
+    using type = std::optional<std::pair<T,U>>;
+    if(a.has_value() && b.has_value()){
+      return type(std::in_place,std::move(*a),std::move(*b));
+    } else {
+      return type();
+    }
+  }));
+}
+
+constexpr inline auto minmax(){
+  return minmax(std::less<>());
+}
+
 
 
 }
