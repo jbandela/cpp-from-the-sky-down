@@ -793,6 +793,33 @@ constexpr inline auto first(){
   return compose(take(1),last());
 }
 
+template<typename Comp>
+constexpr auto min(Comp comp){
+  return accumulate_in_place([]<typename... InputTypes>(types<InputTypes...>) {
+    static_assert(sizeof...(InputTypes) == 1, "Cannot have max/min on multi-argument stream");
+    return types<std::optional<std::remove_cvref_t<InputTypes>...>>();
+ }, [comp = std::move(comp)](auto &acc, auto &&... args) {
+    if(!acc.has_value() || comp(std::as_const(args)...,acc)){
+      acc.emplace(std::forward<decltype(args)>(args)...);
+    }
+  });
+}
+
+template<typename Comp>
+constexpr auto max(Comp comp){
+  return min([comp = std::move(comp)](auto&& a, auto&& b){return comp(b,a);});
+}
+
+constexpr inline auto min(){
+  return min(std::less<>{});
+}
+
+constexpr inline auto max(){
+ return max(std::less<>{});
+}
+
+
+
 }
 
 

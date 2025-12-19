@@ -2627,3 +2627,26 @@ TEST(SplTest, LastWithSwizzle) {
   static_assert(constexpr_last_with_swizzle_test() == std::tuple{9, 7});
   EXPECT_EQ(constexpr_last_with_swizzle_test(), (std::tuple{9, 7}));
 }
+
+constexpr auto constexpr_max_test() {
+  constexpr std::array v{3, 1, 4, 1, 5, 9, 2, 6};
+  constexpr auto result = spl::apply(v, spl::max());
+  static_assert(result == 9);
+  return result;
+}
+
+TEST(SplTest, Max) {
+  EXPECT_EQ(constexpr_max_test(), 9);
+}
+
+constexpr auto constexpr_min_test() {
+  constexpr std::array v{3, 1, 4, 1, 5, 9, 2, 6};
+  constexpr auto result = spl::apply(v, spl::min());
+  static_assert(result == 1);
+  return result;
+}
+
+TEST(SplTest, Min) {
+  EXPECT_EQ(constexpr_min_test(), 1);
+
+}
