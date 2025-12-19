@@ -973,7 +973,7 @@ constexpr auto push_back_into(C& c){
 
 
 // Forward declaration
-template<typename StageProperties, typename InputTypes>
+template<typename StageProperties, typename InputTypes, typename Unwrapper>
 struct unwrap_impl;
 
 template<typename T>
@@ -988,15 +988,14 @@ concept is_optional = is_optional_impl<std::remove_cvref_t<T>>::value;
 template<typename T>
 struct unwrapper_impl;
 
-template<typename T>
-struct unwrapper_impl<std::optional<T>>{
+struct optional_unwrapper{
 
 // We can't use nullopt_t as the error type since that will be stored in unwrap_impl as an optional.
  using error_type = bool;
 
-  template<is_optional U>
-  static constexpr decltype(auto) unwrap(U&& v){
-    return *std::forward<U>(v);
+  template<typename Out, is_optional U>
+  static constexpr decltype(auto) unwrap(Out&& out, U&& v){
+    return out(*std::forward<U>(v));
   }
   
   template<is_optional U>
@@ -1027,7 +1026,7 @@ struct unwrapper_impl<std::optional<T>>{
 
   template<typename U>
   static constexpr std::optional<std::remove_cvref_t<U>> wrap_success(U&& u){
-    return std::optional<std::remove_cvref_t<T>>(std::forward<U>(u)); 
+    return std::optional<std::remove_cvref_t<U>>(std::forward<U>(u)); 
   }
 
   
@@ -1044,16 +1043,16 @@ struct unwrapper_impl<std::optional<T>>{
 
 
 // Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes>
+template<typename StageProperties, typename... InputTypes, typename Unwrapper>
 struct unwrap_impl<StageProperties,
-                     types<InputTypes...>>
+                     types<InputTypes...>, Unwrapper>
     : stage_impl<unwrap_impl<StageProperties,
-                               types<InputTypes...>>> {
+                               types<InputTypes...>,Unwrapper>> {
   using base = typename unwrap_impl::base;
   using output_types = types<InputTypes...>;
   static_assert(sizeof...(InputTypes) == 1, "cannot unwrap more than one input");
   static_assert(is_types<output_types>::value);
-  using unwrapper = unwrapper_impl<std::remove_cvref_t<InputTypes>...>;
+  using unwrapper = Unwrapper;
 
   std::optional<typename unwrapper::error_type> error;
   bool done_ = false;
@@ -1066,7 +1065,7 @@ struct unwrap_impl<StageProperties,
       done_ = true;
       error = unwrapper::get_error(std::as_const(inputs)...);
     } else{
-      this->next.process_incremental(unwrapper::unwrap(static_cast<InputTypes>(inputs)...));
+      unwrapper::unwrap(incremental_outputter{this->next}, static_cast<InputTypes>(inputs)...);
     }
   }
 
@@ -1085,10 +1084,10 @@ struct unwrap_impl<StageProperties,
 
 };
 
-inline constexpr auto unwrap(){
+inline constexpr auto unwrap_optional(){
   return stage<unwrap_impl,
                processing_style::incremental,
-               processing_style::incremental>();
+               processing_style::incremental, optional_unwrapper>();
 }
 
 
