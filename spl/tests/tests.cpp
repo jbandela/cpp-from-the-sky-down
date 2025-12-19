@@ -2893,3 +2893,195 @@ TEST(SplTest, AllOfFromIota) {
   EXPECT_TRUE(constexpr_all_of_from_iota_test());
 }
 
+// stable_sort tests
+TEST(SplTest, StableSortBasic) {
+  std::vector<int> v{3, 1, 4, 1, 5, 9, 2, 6};
+  auto result = spl::apply(v, spl::to_vector(), spl::stable_sort());
+  EXPECT_THAT(result, ElementsAre(1, 1, 2, 3, 4, 5, 6, 9));
+}
+
+TEST(SplTest, StableSortDescending) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::stable_sort(std::greater<>{}));
+  EXPECT_THAT(result, ElementsAre(5, 4, 3, 1, 1));
+}
+
+TEST(SplTest, StableSortPreservesOrder) {
+  // Test that stable_sort preserves relative order of equal elements
+  std::vector<std::pair<int, int>> v{{1, 1}, {2, 1}, {1, 2}, {2, 2}, {1, 3}};
+  auto result = spl::apply(v, spl::to_vector(),
+                          spl::stable_sort([](const auto& a, const auto& b) {
+                            return a.first < b.first;
+                          }));
+  // Elements with same first value should maintain original relative order
+  EXPECT_THAT(result, ElementsAre(Pair(1, 1), Pair(1, 2), Pair(1, 3), Pair(2, 1), Pair(2, 2)));
+}
+
+TEST(SplTest, StableSortEmpty) {
+  std::vector<int> v{};
+  auto result = spl::apply(v, spl::to_vector(), spl::stable_sort());
+  EXPECT_TRUE(result.empty());
+}
+
+// partial_sort tests
+TEST(SplTest, PartialSortBasic) {
+  std::vector<int> v{5, 3, 8, 1, 9, 2, 7, 4, 6};
+  auto result = spl::apply(v, spl::to_vector(), spl::partial_sort(3));
+  // First 3 elements should be the smallest 3 in sorted order
+  EXPECT_EQ(result[0], 1);
+  EXPECT_EQ(result[1], 2);
+  EXPECT_EQ(result[2], 3);
+}
+
+TEST(SplTest, PartialSortDescending) {
+  std::vector<int> v{5, 3, 8, 1, 9, 2, 7, 4, 6};
+  auto result = spl::apply(v, spl::to_vector(), spl::partial_sort(3, std::greater<>{}));
+  // First 3 elements should be the largest 3 in sorted order
+  EXPECT_EQ(result[0], 9);
+  EXPECT_EQ(result[1], 8);
+  EXPECT_EQ(result[2], 7);
+}
+
+TEST(SplTest, PartialSortNGreaterThanSize) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::partial_sort(100));
+  // Should behave like full sort when n > size
+  EXPECT_THAT(result, ElementsAre(1, 1, 3, 4, 5));
+}
+
+TEST(SplTest, PartialSortNEqualsSize) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::partial_sort(5));
+  EXPECT_THAT(result, ElementsAre(1, 1, 3, 4, 5));
+}
+
+TEST(SplTest, PartialSortNZero) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::partial_sort(0));
+  // n=0 means no elements need to be sorted at front
+  EXPECT_EQ(result.size(), 5);
+}
+
+TEST(SplTest, PartialSortEmpty) {
+  std::vector<int> v{};
+  auto result = spl::apply(v, spl::to_vector(), spl::partial_sort(5));
+  EXPECT_TRUE(result.empty());
+}
+
+// nth_element tests
+TEST(SplTest, NthElementBasic) {
+  std::vector<int> v{5, 3, 8, 1, 9, 2, 7, 4, 6};
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(4));
+  // Element at index 4 should be what would be there if sorted (5)
+  EXPECT_EQ(result[4], 5);
+  // All elements before should be <= 5
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_LE(result[i], 5);
+  }
+  // All elements after should be >= 5
+  for (int i = 5; i < 9; ++i) {
+    EXPECT_GE(result[i], 5);
+  }
+}
+
+TEST(SplTest, NthElementDescending) {
+  std::vector<int> v{5, 3, 8, 1, 9, 2, 7, 4, 6};
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(0, std::greater<>{}));
+  // With greater comparator, element at index 0 should be the max (9)
+  EXPECT_EQ(result[0], 9);
+}
+
+TEST(SplTest, NthElementNGreaterThanSize) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+  auto original = v;
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(100));
+  // Should be a no-op when n > size, but still returns the container
+  EXPECT_EQ(result.size(), 5);
+}
+
+TEST(SplTest, NthElementNEqualsSize) {
+  std::vector<int> v{3, 1, 4, 1, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(5));
+  // n == size means nth points to end, should be no-op
+  EXPECT_EQ(result.size(), 5);
+}
+
+TEST(SplTest, NthElementFirst) {
+  std::vector<int> v{5, 3, 8, 1, 9};
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(0));
+  // Element at index 0 should be the minimum (1)
+  EXPECT_EQ(result[0], 1);
+}
+
+TEST(SplTest, NthElementLast) {
+  std::vector<int> v{5, 3, 8, 1, 9};
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(4));
+  // Element at index 4 should be the maximum (9)
+  EXPECT_EQ(result[4], 9);
+}
+
+TEST(SplTest, NthElementEmpty) {
+  std::vector<int> v{};
+  auto result = spl::apply(v, spl::to_vector(), spl::nth_element(0));
+  EXPECT_TRUE(result.empty());
+}
+
+// unique tests
+TEST(SplTest, UniqueBasic) {
+  std::vector<int> v{1, 1, 2, 2, 2, 3, 3, 4, 5, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, UniqueNoConsecutiveDuplicates) {
+  std::vector<int> v{1, 2, 1, 2, 1};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  // unique only removes consecutive duplicates
+  EXPECT_THAT(result, ElementsAre(1, 2, 1, 2, 1));
+}
+
+TEST(SplTest, UniqueAllSame) {
+  std::vector<int> v{5, 5, 5, 5, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  EXPECT_THAT(result, ElementsAre(5));
+}
+
+TEST(SplTest, UniqueAllDifferent) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, UniqueEmpty) {
+  std::vector<int> v{};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, UniqueSingleElement) {
+  std::vector<int> v{42};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  EXPECT_THAT(result, ElementsAre(42));
+}
+
+TEST(SplTest, UniqueWithCustomPredicate) {
+  std::vector<int> v{1, 2, 3, 4, 5, 6, 7, 8};
+  // Consider consecutive elements "equal" if they have the same parity
+  auto result = spl::apply(v, spl::to_vector(), spl::unique([](int a, int b) {
+    return (a % 2) == (b % 2);
+  }));
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5, 6, 7, 8));
+}
+
+TEST(SplTest, UniqueWithSortFirst) {
+  std::vector<int> v{3, 1, 2, 1, 3, 2, 1};
+  auto result = spl::apply(v, spl::to_vector(), spl::sort(), spl::unique());
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, UniqueStrings) {
+  std::vector<std::string> v{"a", "a", "b", "b", "b", "c"};
+  auto result = spl::apply(v, spl::to_vector(), spl::unique());
+  EXPECT_THAT(result, ElementsAre("a", "b", "c"));
+}
+

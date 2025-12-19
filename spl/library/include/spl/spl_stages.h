@@ -52,6 +52,26 @@ constexpr auto sort(Comparator comp);
 
 constexpr auto sort();
 
+template<typename Comparator>
+constexpr auto stable_sort(Comparator comp);
+
+constexpr auto stable_sort();
+
+template<typename Comparator>
+constexpr auto partial_sort(size_t n, Comparator comp);
+
+constexpr auto partial_sort(size_t n);
+
+template<typename Comparator>
+constexpr auto nth_element(size_t n, Comparator comp);
+
+constexpr auto nth_element(size_t n);
+
+template<typename BinaryPredicate>
+constexpr auto unique(BinaryPredicate pred);
+
+constexpr auto unique();
+
 // Filtering and selection stages
 template<typename Predicate>
 constexpr auto filter(Predicate predicate);
@@ -406,6 +426,65 @@ constexpr auto sort(Comparator comp) {
 
 constexpr auto sort() {
   return sort(std::less<>{});
+}
+
+template<typename Comparator>
+constexpr auto stable_sort(Comparator comp) {
+  return transform_complete_cps([comp = std::move(comp)](auto &&out,
+                                                         auto &&container) {
+    auto sorted = std::forward<decltype(container)>(container);
+    std::stable_sort(sorted.begin(), sorted.end(), comp);
+    return out(std::move(sorted));
+  });
+}
+
+constexpr auto stable_sort() {
+  return stable_sort(std::less<>{});
+}
+
+template<typename Comparator>
+constexpr auto partial_sort(size_t n, Comparator comp) {
+  return transform_complete_cps([n, comp = std::move(comp)](auto &&out,
+                                                             auto &&container) {
+    auto result = std::forward<decltype(container)>(container);
+    auto middle = n < result.size() ? result.begin() + n : result.end();
+    std::partial_sort(result.begin(), middle, result.end(), comp);
+    return out(std::move(result));
+  });
+}
+
+constexpr auto partial_sort(size_t n) {
+  return partial_sort(n, std::less<>{});
+}
+
+template<typename Comparator>
+constexpr auto nth_element(size_t n, Comparator comp) {
+  return transform_complete_cps([n, comp = std::move(comp)](auto &&out,
+                                                             auto &&container) {
+    auto result = std::forward<decltype(container)>(container);
+    auto nth = n < result.size() ? result.begin() + n : result.end();
+    std::nth_element(result.begin(), nth, result.end(), comp);
+    return out(std::move(result));
+  });
+}
+
+constexpr auto nth_element(size_t n) {
+  return nth_element(n, std::less<>{});
+}
+
+template<typename BinaryPredicate>
+constexpr auto unique(BinaryPredicate pred) {
+  return transform_complete_cps([pred = std::move(pred)](auto &&out,
+                                                          auto &&container) {
+    auto result = std::forward<decltype(container)>(container);
+    auto new_end = std::unique(result.begin(), result.end(), pred);
+    result.erase(new_end, result.end());
+    return out(std::move(result));
+  });
+}
+
+constexpr auto unique() {
+  return unique(std::equal_to<>{});
 }
 
 inline constexpr auto expand_tuple() {
