@@ -290,6 +290,10 @@ constexpr auto filter(Predicate predicate) {
   });
 }
 
+constexpr inline auto filter(){
+  return filter(std::identity{});
+}
+
 constexpr auto take(size_t
                     n) {
   return flat_map([
@@ -851,6 +855,17 @@ constexpr auto minmax(Comp comp){
 constexpr inline auto minmax(){
   return minmax(std::less<>());
 }
+
+template<typename Predicate>
+constexpr inline auto any_of(Predicate pred){
+  return spl::compose(spl::filter(pred),
+  spl::transform([](auto&&...){return true;}),
+  spl::first(),
+  spl::transform_complete([](auto&& v){return v.value_or(false);})
+);
+}
+
+
 
 
 

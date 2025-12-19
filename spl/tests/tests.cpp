@@ -2670,3 +2670,88 @@ TEST(SplTest, MinMax) {
   EXPECT_EQ(result->second, 9);
 }
 
+// any_of tests
+constexpr auto constexpr_any_of_true_test() {
+  constexpr std::array v{1, 3, 5, 6, 9};
+  return spl::apply(v, spl::any_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, AnyOfTrue) {
+  static_assert(constexpr_any_of_true_test() == true);
+  EXPECT_TRUE(constexpr_any_of_true_test());
+}
+
+constexpr auto constexpr_any_of_false_test() {
+  constexpr std::array v{1, 3, 5, 7, 9};
+  return spl::apply(v, spl::any_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, AnyOfFalse) {
+  static_assert(constexpr_any_of_false_test() == false);
+  EXPECT_FALSE(constexpr_any_of_false_test());
+}
+
+constexpr auto constexpr_any_of_empty_test() {
+  constexpr std::array<int, 0> v{};
+  return spl::apply(v, spl::any_of([](int x) { return x > 0; }));
+}
+
+TEST(SplTest, AnyOfEmpty) {
+  static_assert(constexpr_any_of_empty_test() == false);
+  EXPECT_FALSE(constexpr_any_of_empty_test());
+}
+
+constexpr auto constexpr_any_of_first_match_test() {
+  constexpr std::array v{2, 4, 6, 8, 10};
+  return spl::apply(v, spl::any_of([](int x) { return x == 2; }));
+}
+
+TEST(SplTest, AnyOfFirstMatch) {
+  static_assert(constexpr_any_of_first_match_test() == true);
+  EXPECT_TRUE(constexpr_any_of_first_match_test());
+}
+
+constexpr auto constexpr_any_of_last_match_test() {
+  constexpr std::array v{1, 3, 5, 7, 10};
+  return spl::apply(v, spl::any_of([](int x) { return x % 2 == 0; }));
+}
+
+TEST(SplTest, AnyOfLastMatch) {
+  static_assert(constexpr_any_of_last_match_test() == true);
+  EXPECT_TRUE(constexpr_any_of_last_match_test());
+}
+
+constexpr auto constexpr_any_of_with_filter_test() {
+  constexpr std::array v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  return spl::apply(v,
+                   spl::filter([](int x) { return x > 5; }),
+                   spl::any_of([](int x) { return x % 3 == 0; }));
+}
+
+TEST(SplTest, AnyOfWithFilter) {
+  static_assert(constexpr_any_of_with_filter_test() == true);  // 6 and 9 match
+  EXPECT_TRUE(constexpr_any_of_with_filter_test());
+}
+
+constexpr auto constexpr_any_of_with_transform_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return x * 10; }),
+                   spl::any_of([](int x) { return x > 40; }));
+}
+
+TEST(SplTest, AnyOfWithTransform) {
+  static_assert(constexpr_any_of_with_transform_test() == true);  // 50 > 40
+  EXPECT_TRUE(constexpr_any_of_with_transform_test());
+}
+
+constexpr auto constexpr_any_of_from_iota_test() {
+  return spl::apply(spl::iota(1, 10),
+                   spl::any_of([](int x) { return x == 7; }));
+}
+
+TEST(SplTest, AnyOfFromIota) {
+  static_assert(constexpr_any_of_from_iota_test() == true);
+  EXPECT_TRUE(constexpr_any_of_from_iota_test());
+}
+
