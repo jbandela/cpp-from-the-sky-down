@@ -993,6 +993,9 @@ struct optional_unwrapper{
 // We can't use nullopt_t as the error type since that will be stored in unwrap_impl as an optional.
  using error_type = bool;
 
+ template<typename T>
+ using unwrapped_type = decltype(*std::declval<T>());
+
   template<typename Out, is_optional U>
   static constexpr decltype(auto) unwrap(Out&& out, U&& v){
     return out(*std::forward<U>(v));
@@ -1020,7 +1023,7 @@ struct optional_unwrapper{
 
 
   template<is_optional U>
-  static constexpr decltype(auto) wrap_success(U&& v){
+  static constexpr auto wrap_success(U&& v){
     return std::forward<U>(v);
   }
 
@@ -1049,7 +1052,7 @@ struct unwrap_impl<StageProperties,
     : stage_impl<unwrap_impl<StageProperties,
                                types<InputTypes...>,Unwrapper>> {
   using base = typename unwrap_impl::base;
-  using output_types = types<InputTypes...>;
+  using output_types = types<typename Unwrapper::template unwrapped_type<InputTypes>...>;
   static_assert(sizeof...(InputTypes) == 1, "cannot unwrap more than one input");
   static_assert(is_types<output_types>::value);
   using unwrapper = Unwrapper;

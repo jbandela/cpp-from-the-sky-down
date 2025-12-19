@@ -3344,3 +3344,176 @@ TEST(SplTest, UnwrappSomeFail) {
   EXPECT_FALSE(result);
 }
 
+// unwrap_optional tests with first/last (which return optional)
+// Note: wrap_success avoids optional<optional<T>> by forwarding if result is already optional
+constexpr std::optional<int> constexpr_unwrap_first_success_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return std::make_optional(x * 2); }),
+                   spl::unwrap_optional(),
+                   spl::first());
+}
+
+TEST(SplTest, UnwrapOptionalFirstSuccess) {
+  constexpr std::optional<int> result = constexpr_unwrap_first_success_test();
+  static_assert(result.has_value());
+  static_assert(*result == 2);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 2);
+}
+
+constexpr std::optional<int> constexpr_unwrap_first_fail_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) -> std::optional<int> {
+                     return std::nullopt;  // All fail
+                   }),
+                   spl::unwrap_optional(),
+                   spl::first());
+}
+
+TEST(SplTest, UnwrapOptionalFirstFail) {
+  constexpr std::optional<int> result = constexpr_unwrap_first_fail_test();
+  static_assert(!result.has_value());
+  EXPECT_FALSE(result.has_value());
+}
+
+constexpr std::optional<int> constexpr_unwrap_last_success_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return std::make_optional(x * 10); }),
+                   spl::unwrap_optional(),
+                   spl::last());
+}
+
+TEST(SplTest, UnwrapOptionalLastSuccess) {
+  constexpr std::optional<int> result = constexpr_unwrap_last_success_test();
+  static_assert(result.has_value());
+  static_assert(*result == 50);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 50);
+}
+
+constexpr std::optional<int> constexpr_unwrap_last_fail_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) -> std::optional<int> {
+                     return std::nullopt;
+                   }),
+                   spl::unwrap_optional(),
+                   spl::last());
+}
+
+TEST(SplTest, UnwrapOptionalLastFail) {
+  constexpr std::optional<int> result = constexpr_unwrap_last_fail_test();
+  static_assert(!result.has_value());
+  EXPECT_FALSE(result.has_value());
+}
+
+constexpr std::optional<int> constexpr_unwrap_first_partial_fail_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) -> std::optional<int> {
+                     if (x == 1) return std::nullopt;  // First one fails
+                     return x * 2;
+                   }),
+                   spl::unwrap_optional(),
+                   spl::first());
+}
+
+TEST(SplTest, UnwrapOptionalFirstPartialFail) {
+  // Since first element fails unwrap, the whole pipeline fails
+  constexpr std::optional<int> result = constexpr_unwrap_first_partial_fail_test();
+  static_assert(!result.has_value());
+  EXPECT_FALSE(result.has_value());
+}
+
+constexpr std::optional<int> constexpr_unwrap_with_filter_first_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) -> std::optional<int> {
+                     if (x % 2 == 0) return x;  // Only even numbers succeed
+                     return std::nullopt;
+                   }),
+                   spl::unwrap_optional(),
+                   spl::first());
+}
+
+TEST(SplTest, UnwrapOptionalWithFilterFirst) {
+  // First nullopt causes failure, even though later elements would succeed
+  constexpr std::optional<int> result = constexpr_unwrap_with_filter_first_test();
+  static_assert(!result.has_value());
+  EXPECT_FALSE(result.has_value());
+}
+
+constexpr std::optional<int> constexpr_unwrap_sum_success_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) { return std::make_optional(x); }),
+                   spl::unwrap_optional(),
+                   spl::sum());
+}
+
+TEST(SplTest, UnwrapOptionalSumSuccess) {
+  constexpr std::optional<int> result = constexpr_unwrap_sum_success_test();
+  static_assert(result.has_value());
+  static_assert(*result == 15);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 15);
+}
+
+constexpr std::optional<int> constexpr_unwrap_sum_fail_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+                   spl::transform([](int x) -> std::optional<int> {
+                     if (x == 3) return std::nullopt;
+                     return x;
+                   }),
+                   spl::unwrap_optional(),
+                   spl::sum());
+}
+
+TEST(SplTest, UnwrapOptionalSumFail) {
+  constexpr std::optional<int> result = constexpr_unwrap_sum_fail_test();
+  static_assert(!result.has_value());
+  EXPECT_FALSE(result.has_value());
+}
+
+constexpr std::optional<size_t> constexpr_unwrap_count_success_test() {
+  constexpr std::array v{1, 2, 3};
+  return spl::apply(v,
+                   spl::transform([](int x) { return std::make_optional(x * 2); }),
+                   spl::unwrap_optional(),
+                   spl::count());
+}
+
+TEST(SplTest, UnwrapOptionalCountSuccess) {
+  constexpr std::optional<size_t> result = constexpr_unwrap_count_success_test();
+  static_assert(result.has_value());
+  static_assert(*result == 3);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 3);
+}
+
+TEST(SplTest, UnwrapOptionalToVectorRuntime) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+  std::optional<std::vector<int>> result = spl::apply(v,
+                          spl::transform([](int x) { return std::make_optional(x * 2); }),
+                          spl::unwrap_optional(),
+                          spl::to_vector());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_THAT(*result, ElementsAre(2, 4, 6, 8, 10));
+}
+
+TEST(SplTest, UnwrapOptionalToVectorRuntimeFail) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+  std::optional<std::vector<int>> result = spl::apply(v,
+                          spl::transform([](int x) -> std::optional<int> {
+                            if (x == 3) return std::nullopt;
+                            return x * 2;
+                          }),
+                          spl::unwrap_optional(),
+                          spl::to_vector());
+  EXPECT_FALSE(result.has_value());
+}
+
