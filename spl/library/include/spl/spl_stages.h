@@ -958,6 +958,13 @@ constexpr inline auto all_of(Predicate pred){
   });
 }
 
+template<typename C>
+constexpr auto push_back_into(C& c){
+  return spl::for_each([&c](auto&& arg){
+    c.push_back(std::forward<decltype(arg)>(arg));
+  });
+}
+
 
 }
 

@@ -1,5 +1,7 @@
 #include <gmock/gmock.h>
 #include <spl/spl.h> // Include your library's header
+#include <deque>
+#include <list>
 
 namespace {
 
@@ -3083,5 +3085,158 @@ TEST(SplTest, UniqueStrings) {
   std::vector<std::string> v{"a", "a", "b", "b", "b", "c"};
   auto result = spl::apply(v, spl::to_vector(), spl::unique());
   EXPECT_THAT(result, ElementsAre("a", "b", "c"));
+}
+
+// push_back_to tests
+TEST(SplTest, PushBackToVector) {
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v, spl::push_back_to<std::vector>());
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, PushBackToDeque) {
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v, spl::push_back_to<std::deque>());
+  EXPECT_EQ(result.size(), 5);
+  EXPECT_EQ(result[0], 1);
+  EXPECT_EQ(result[4], 5);
+}
+
+TEST(SplTest, PushBackToList) {
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v, spl::push_back_to<std::list>());
+  EXPECT_EQ(result.size(), 5);
+  EXPECT_EQ(result.front(), 1);
+  EXPECT_EQ(result.back(), 5);
+}
+
+TEST(SplTest, PushBackToEmpty) {
+  std::array<int, 0> v{};
+  auto result = spl::apply(v, spl::push_back_to<std::vector>());
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, PushBackToWithTransform) {
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v,
+                          spl::transform([](int x) { return x * 2; }),
+                          spl::push_back_to<std::vector>());
+  EXPECT_THAT(result, ElementsAre(2, 4, 6, 8, 10));
+}
+
+TEST(SplTest, PushBackToWithFilter) {
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v,
+                          spl::filter([](int x) { return x % 2 == 0; }),
+                          spl::push_back_to<std::vector>());
+  EXPECT_THAT(result, ElementsAre(2, 4));
+}
+
+TEST(SplTest, PushBackToStrings) {
+  std::array<std::string, 3> v{"hello", "world", "test"};
+  auto result = spl::apply(v, spl::push_back_to<std::vector>());
+  EXPECT_THAT(result, ElementsAre("hello", "world", "test"));
+}
+
+TEST(SplTest, PushBackToFromIota) {
+  auto result = spl::apply(spl::iota(1, 6), spl::push_back_to<std::vector>());
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, PushBackToWithTake) {
+  std::array<int, 10> v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  auto result = spl::apply(v,
+                          spl::take(3),
+                          spl::push_back_to<std::vector>());
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+// push_back_into tests
+TEST(SplTest, PushBackIntoVector) {
+  std::vector<int> result;
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  spl::apply(v, spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, PushBackIntoExistingElements) {
+  std::vector<int> result{10, 20};
+  std::array<int, 3> v{1, 2, 3};
+  spl::apply(v, spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(10, 20, 1, 2, 3));
+}
+
+TEST(SplTest, PushBackIntoDeque) {
+  std::deque<int> result;
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  spl::apply(v, spl::push_back_into(result));
+  EXPECT_EQ(result.size(), 5);
+  EXPECT_EQ(result[0], 1);
+  EXPECT_EQ(result[4], 5);
+}
+
+TEST(SplTest, PushBackIntoList) {
+  std::list<int> result;
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  spl::apply(v, spl::push_back_into(result));
+  EXPECT_EQ(result.size(), 5);
+  EXPECT_EQ(result.front(), 1);
+  EXPECT_EQ(result.back(), 5);
+}
+
+TEST(SplTest, PushBackIntoEmpty) {
+  std::vector<int> result;
+  std::array<int, 0> v{};
+  spl::apply(v, spl::push_back_into(result));
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, PushBackIntoWithTransform) {
+  std::vector<int> result;
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  spl::apply(v,
+            spl::transform([](int x) { return x * 2; }),
+            spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(2, 4, 6, 8, 10));
+}
+
+TEST(SplTest, PushBackIntoWithFilter) {
+  std::vector<int> result;
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  spl::apply(v,
+            spl::filter([](int x) { return x % 2 == 0; }),
+            spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(2, 4));
+}
+
+TEST(SplTest, PushBackIntoStrings) {
+  std::vector<std::string> result;
+  std::array<std::string, 3> v{"hello", "world", "test"};
+  spl::apply(v, spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre("hello", "world", "test"));
+}
+
+TEST(SplTest, PushBackIntoFromIota) {
+  std::vector<int> result;
+  spl::apply(spl::iota(1, 6), spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, PushBackIntoMultipleTimes) {
+  std::vector<int> result;
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 2> v2{4, 5};
+  spl::apply(v1, spl::push_back_into(result));
+  spl::apply(v2, spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, PushBackIntoWithTake) {
+  std::vector<int> result;
+  std::array<int, 10> v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  spl::apply(v,
+            spl::take(3),
+            spl::push_back_into(result));
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
 }
 
