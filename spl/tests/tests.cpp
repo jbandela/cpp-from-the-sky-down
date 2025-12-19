@@ -299,7 +299,6 @@ constexpr auto constexpr_flatten_multiple_args_test() {
                     spl::sum());
 }
 
-#if 1
 TEST(SplTest, FlattenMultipleArgs) {
   static_assert(constexpr_flatten_multiple_args_test()
                     == 111); // (10+1)+(10+2)+(10+3)+(20+4)+(20+5)+(20+6) = 11+12+13+24+25+26 = 111
@@ -324,7 +323,6 @@ TEST(SplTest, FlattenMultipleArgs) {
       pair_type{"b", 4}, pair_type{"b", 5}
   ));
 }
-#endif
 
 constexpr auto constexpr_zip_result_test() {
   constexpr std::array v{1, 2, 3, 4};
@@ -577,7 +575,8 @@ TEST(SplTest, Tee) {
       spl::tee(
           spl::sum(),
           spl::compose(spl::transform([](int x) { return x * x; }), spl::sum())
-      )
+      ),
+      spl::make_tuple_complete()
   );
 
   static_assert(std::get<0>(result) == 15);  // sum
@@ -594,7 +593,8 @@ TEST(SplTest, TeeConstexpr) {
             spl::sum(),
             spl::compose(spl::transform([](int x) { return x / 2; }),
                          spl::sum())
-        )
+        ),
+        spl::make_tuple_complete()
     );
   }();
 
@@ -605,7 +605,8 @@ TEST(SplTest, TeeConstexpr) {
 TEST(SplTest, TeeSinglePipeline) {
   auto result = spl::apply(
       std::vector{1, 2, 3},
-      spl::tee(spl::sum())
+      spl::tee(spl::sum()),
+      spl::make_tuple_complete()
   );
 
   EXPECT_EQ(std::get<0>(result), 6);
@@ -618,7 +619,8 @@ TEST(SplTest, TeeThreePipelines) {
           spl::sum(),
           spl::compose(spl::transform([](int x) { return x * x; }), spl::sum()),
           spl::compose(spl::transform([](int x) { return x * 2; }), spl::sum())
-      )
+      ),
+      spl::make_tuple_complete()
   );
 
   static_assert(std::get<0>(result) == 14);   // sum: 2+3+4+5
@@ -636,7 +638,8 @@ TEST(SplTest, TeeWithVector) {
           spl::sum(),
           spl::to_vector(),
           spl::compose(spl::filter([](int x) { return x > 15; }), spl::sum())
-      )
+      ),
+      spl::make_tuple_complete()
   );
 
   EXPECT_EQ(std::get<0>(result), 60);
@@ -653,7 +656,8 @@ TEST(SplTest, TeeMultiArgument) {
                        spl::sum()),
           spl::compose(spl::transform([](int x, int y) { return x * y; }),
                        spl::sum())
-      )
+      ),
+      spl::make_tuple_complete()
   );
 
   static_assert(
@@ -664,7 +668,6 @@ TEST(SplTest, TeeMultiArgument) {
   EXPECT_EQ(std::get<0>(result), 66);   // (1+10) + (2+20) + (3+30) = 11+22+33
   EXPECT_EQ(std::get<1>(result), 140);  // (1*10) + (2*20) + (3*30) = 10+40+90
 }
-
 constexpr auto constexpr_for_each_test() {
   constexpr std::array v{1, 2, 3, 4, 5};
   int sum = 0;
@@ -784,8 +787,8 @@ constexpr auto constexpr_transform_complete_multiple_test() {
                           return x * x;
                         }), spl::sum())
                     ),
-                    spl::transform_complete([](auto tuple) {
-                      return std::get<0>(tuple) + std::get<1>(tuple);
+                    spl::transform_complete([](auto&& a, auto&& b) {
+                      return a + b;
                     }));
 }
 
@@ -1638,7 +1641,7 @@ constexpr auto constexpr_zip_with_tee_test() {
                           spl::tee(
                               spl::compose(spl::transform([](int a, int b) { return a; }), spl::sum()),
                               spl::compose(spl::transform([](int a, int b) { return b; }), spl::sum())
-                          ));
+                          ),spl::make_tuple_complete());
   return std::get<0>(result) + std::get<1>(result);
 }
 
@@ -2559,7 +2562,7 @@ TEST(SplTest, LastMultiArg) {
 constexpr auto constexpr_first_last_tee_test() {
   constexpr std::array v{5, 10, 15, 20, 25};
   return spl::apply(v,
-                   spl::tee(spl::first(), spl::last()));
+                   spl::tee(spl::first(), spl::last()), spl::make_tuple_complete());
 }
 
 TEST(SplTest, FirstLastWithTee) {

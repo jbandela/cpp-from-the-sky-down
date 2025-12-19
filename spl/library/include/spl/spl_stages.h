@@ -421,6 +421,23 @@ inline constexpr auto make_pair() {
   });
 }
 
+inline constexpr auto expand_tuple_complete() {
+  return transform_complete_cps([&](auto &&out, auto &&tuple) {
+    return std::apply(out, std::forward<decltype(tuple)>(tuple));
+  });
+}
+
+inline constexpr auto make_tuple_complete() {
+  return transform_complete_cps([&](auto &&out, auto &&... ts) {
+    return out(std::make_tuple(std::forward<decltype(ts)>(ts)...));
+  });
+}
+inline constexpr auto make_pair_complete() {
+  return transform_complete_cps([&](auto &&out, auto &&... ts) {
+    return out(std::make_pair(std::forward<decltype(ts)>(ts)...));
+  });
+}
+
 template<typename F>
 constexpr auto zip_result(F f) {
   return transform_cps([f = std::move(f)](auto &&out, auto &&... inputs) {
@@ -574,8 +591,8 @@ struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
                                                     processing_style::incremental>(
       std::declval<C>()));
 
-  using output_types = types<std::tuple<std::remove_cvref_t<decltype(std::declval<
-      pipeline_type<Composed>>().finish())>...> &&>;
+  using output_types = types<decltype(std::declval<
+      pipeline_type<Composed>>().finish())&&...>;
 
   std::tuple<pipeline_type<Composed>...> pipelines;
 
@@ -592,9 +609,9 @@ struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
   }
 
   constexpr decltype(auto) finish() {
-    return this->next.process_complete(std::apply([](auto &&... pipes) {
-      return std::make_tuple(pipes.finish()...);
-    }, pipelines));
+    return std::apply([this](auto &&... pipes) {
+      return this->next.process_complete(pipes.finish()...);
+    }, pipelines);
   }
 
  private:
