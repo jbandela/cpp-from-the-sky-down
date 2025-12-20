@@ -988,27 +988,69 @@ concept is_optional = is_optional_impl<std::remove_cvref_t<T>>::value;
 template<typename T>
 struct unwrapper_impl;
 
+template<size_t TargetI, size_t I, typename T>
+struct unwrap_optional_type_helper{
+  using type = T;
+ constexpr static decltype(auto) unwrap(T t){
+   return static_cast<T>(t);
+ }
+
+constexpr static bool has_error(auto&&){
+  return false;
+ }
+
+constexpr static void set_error(auto&&, bool&){
+}
+};
+
+template<size_t I, typename T>
+struct unwrap_optional_type_helper<I,I,T>{
+ using type = decltype(*std::declval<T>());
+
+ constexpr static decltype(auto) unwrap(T t){
+   return *static_cast<T>(t);
+ }
+
+constexpr static bool has_error(auto&& t){
+  return !t.has_value();
+ }
+
+constexpr static void set_error(auto&& t, bool& b){
+  b = !t.has_value();
+}
+};
+
+
+template<size_t I>
 struct optional_unwrapper{
 
 // We can't use nullopt_t as the error type since that will be stored in unwrap_impl as an optional.
  using error_type = bool;
 
- template<typename T>
- using unwrapped_type = decltype(*std::declval<T>());
+  template<typename Out, typename... Ts>
+  static constexpr decltype(auto) unwrap(Out&& out, Ts&&... ts ){
 
-  template<typename Out, is_optional U>
-  static constexpr decltype(auto) unwrap(Out&& out, U&& v){
-    return out(*std::forward<U>(v));
+    return [&]<size_t... Is>(std::index_sequence<Is...>) {
+      
+    return out(unwrap_optional_type_helper<I, Is,Ts&&>::unwrap(std::forward<Ts>(ts))...);
+    }(std::make_index_sequence<sizeof...(Ts)>{});
   }
   
-  template<is_optional U>
-  static constexpr bool has_error(U&& v){
-    return !v.has_value();
+  
+  template<typename... Ts>
+  static constexpr bool has_error(Ts&&... ts){
+    return [&]<size_t... Is>(std::index_sequence<Is...>) {
+      return (unwrap_optional_type_helper<I, Is,Ts&&>::has_error(std::as_const(ts)) || ...);
+    }(std::make_index_sequence<sizeof...(Ts)>{});
   }
 
-  template<is_optional U>
-  static constexpr error_type get_error(U&&){
-    return true;
+  template<typename... Ts>
+  static constexpr error_type get_error(Ts&&... ts){
+    bool b = false;
+    return [&]<size_t... Is>(std::index_sequence<Is...>) {
+      (unwrap_optional_type_helper<I, Is,Ts&&>::set_error(std::as_const(ts),b), ...);
+      return b;
+    }(std::make_index_sequence<sizeof...(Ts)>{});
   }
 
   template<is_optional U>
@@ -1052,8 +1094,11 @@ struct unwrap_impl<StageProperties,
     : stage_impl<unwrap_impl<StageProperties,
                                types<InputTypes...>,Unwrapper>> {
   using base = typename unwrap_impl::base;
-  using output_types = types<typename Unwrapper::template unwrapped_type<InputTypes>...>;
-  static_assert(sizeof...(InputTypes) == 1, "cannot unwrap more than one input");
+  using output_types = decltype(Unwrapper::unwrap(
+      type_calculating_outputter(),
+      std::declval<InputTypes>()...));
+
+
   static_assert(is_types<output_types>::value);
   using unwrapper = Unwrapper;
 
@@ -1090,7 +1135,7 @@ struct unwrap_impl<StageProperties,
 inline constexpr auto unwrap_optional(){
   return stage<unwrap_impl,
                processing_style::incremental,
-               processing_style::incremental, optional_unwrapper>();
+               processing_style::incremental, optional_unwrapper<0>>();
 }
 
 
