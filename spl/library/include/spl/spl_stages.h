@@ -1142,6 +1142,13 @@ inline constexpr auto unwrap_optional(){
                processing_style::incremental, optional_unwrapper<0>>();
 }
 
+template<size_t I>
+inline constexpr auto unwrap_optional(){
+  return stage<unwrap_impl,
+               processing_style::incremental,
+               processing_style::incremental, optional_unwrapper<I>>();
+}
+
 
 }
 
