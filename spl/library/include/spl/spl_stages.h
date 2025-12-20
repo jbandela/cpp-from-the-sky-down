@@ -1016,11 +1016,11 @@ struct unwrap_optional_type_helper<I,I,T>{
  }
 
 constexpr static bool has_error(auto&& t){
-  return !t.has_value();
+  return !t;
  }
 
 constexpr static void set_error(auto&& t, bool& b){
-  b = !t.has_value();
+  b = !t;
 }
 };
 

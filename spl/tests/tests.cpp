@@ -3545,3 +3545,115 @@ TEST(SplTest, UnwrapOptionalToVectorRuntimeFail) {
   EXPECT_FALSE(result.has_value());
 }
 
+// unwrap_optional tests with pointers
+TEST(SplTest, UnwrapPointerSuccess) {
+  int a = 10, b = 20, c = 30;
+  std::array<int*, 3> v{&a, &b, &c};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::sum());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 60);
+}
+
+TEST(SplTest, UnwrapPointerFail) {
+  int a = 10, b = 20;
+  std::array<int*, 3> v{&a, nullptr, &b};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::sum());
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(SplTest, UnwrapPointerFirstSuccess) {
+  int a = 10, b = 20, c = 30;
+  std::array<int*, 3> v{&a, &b, &c};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::first());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 10);
+}
+
+TEST(SplTest, UnwrapPointerFirstFail) {
+  int a = 10, b = 20;
+  std::array<int*, 3> v{nullptr, &a, &b};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::first());
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(SplTest, UnwrapPointerLastSuccess) {
+  int a = 10, b = 20, c = 30;
+  std::array<int*, 3> v{&a, &b, &c};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::last());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 30);
+}
+
+TEST(SplTest, UnwrapPointerLastFail) {
+  int a = 10, b = 20;
+  std::array<int*, 3> v{&a, nullptr, &b};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::last());
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(SplTest, UnwrapPointerCount) {
+  int a = 10, b = 20, c = 30;
+  std::array<int*, 3> v{&a, &b, &c};
+  std::optional<size_t> result = spl::apply(v, spl::unwrap_optional(), spl::count());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 3);
+}
+
+TEST(SplTest, UnwrapPointerToVector) {
+  int a = 1, b = 2, c = 3;
+  std::array<int*, 3> v{&a, &b, &c};
+  std::optional<std::vector<int>> result = spl::apply(v, spl::unwrap_optional(), spl::to_vector());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_THAT(*result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, UnwrapPointerToVectorFail) {
+  int a = 1, b = 2;
+  std::array<int*, 3> v{&a, nullptr, &b};
+  std::optional<std::vector<int>> result = spl::apply(v, spl::unwrap_optional(), spl::to_vector());
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(SplTest, UnwrapPointerWithTransform) {
+  int a = 1, b = 2, c = 3;
+  std::array<int*, 3> v{&a, &b, &c};
+  std::optional<int> result = spl::apply(v,
+                          spl::unwrap_optional(),
+                          spl::transform([](int x) { return x * 10; }),
+                          spl::sum());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 60);
+}
+
+TEST(SplTest, UnwrapPointerAllNull) {
+  std::array<int*, 3> v{nullptr, nullptr, nullptr};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::sum());
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(SplTest, UnwrapPointerEmpty) {
+  std::array<int*, 0> v{};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::sum());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 0);
+}
+
+TEST(SplTest, UnwrapPointerWithFilter) {
+  int a = 1, b = 2, c = 3, d = 4;
+  std::array<int*, 4> v{&a, &b, &c, &d};
+  std::optional<int> result = spl::apply(v,
+                          spl::unwrap_optional(),
+                          spl::filter([](int x) { return x % 2 == 0; }),
+                          spl::sum());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 6);  // 2 + 4
+}
+
+TEST(SplTest, UnwrapConstPointerSuccess) {
+  const int a = 10, b = 20, c = 30;
+  std::array<const int*, 3> v{&a, &b, &c};
+  std::optional<int> result = spl::apply(v, spl::unwrap_optional(), spl::sum());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 60);
+}
+
