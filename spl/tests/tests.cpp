@@ -3820,3 +3820,118 @@ TEST(SplTest, UnwrapOptionalIndexWithToVectorFail) {
   EXPECT_FALSE(result.has_value());
 }
 
+// ============================================================================
+// as_incremental Tests
+// ============================================================================
+
+TEST(SplTest, AsIncrementalBasic) {
+  // Use as_incremental to convert sum (complete) output to incremental
+  // so it can be further processed incrementally
+  std::array<int, 3> v{1, 2, 3};
+  int result = spl::apply(v,
+                          spl::sum(),
+                          spl::as_incremental(),
+                          spl::transform([](int x) { return x * 2; }),
+                          spl::first()).value();
+  EXPECT_EQ(result, 12);  // sum is 6, doubled is 12
+}
+
+TEST(SplTest, AsIncrementalWithToVector) {
+  // Collect complete output as a single item in a vector
+  std::array<int, 4> v{1, 2, 3, 4};
+  std::vector<int> result = spl::apply(v,
+                                       spl::sum(),
+                                       spl::as_incremental(),
+                                       spl::to_vector());
+  EXPECT_THAT(result, ElementsAre(10));
+}
+
+TEST(SplTest, AsIncrementalWithFilter) {
+  // Complete output treated as incremental can be filtered
+  std::array<int, 3> v{1, 2, 3};
+  std::optional<int> result = spl::apply(v,
+                                         spl::sum(),
+                                         spl::as_incremental(),
+                                         spl::filter([](int x) { return x > 10; }),
+                                         spl::first());
+  EXPECT_FALSE(result.has_value());  // sum is 6, which is not > 10
+
+  std::array<int, 5> v2{1, 2, 3, 4, 5};
+  std::optional<int> result2 = spl::apply(v2,
+                                          spl::sum(),
+                                          spl::as_incremental(),
+                                          spl::filter([](int x) { return x > 10; }),
+                                          spl::first());
+  EXPECT_TRUE(result2.has_value());  // sum is 15, which is > 10
+  EXPECT_EQ(*result2, 15);
+}
+
+TEST(SplTest, AsIncrementalWithTransformComplete) {
+  // Chain: complete -> incremental -> complete
+  std::array<int, 3> v{1, 2, 3};
+  int result = spl::apply(v,
+                          spl::sum(),  // complete: 6
+                          spl::as_incremental(),  // convert to incremental
+                          spl::transform([](int x) { return x + 10; }),  // incremental: 16
+                          spl::sum());  // complete: 16
+  EXPECT_EQ(result, 16);
+}
+
+TEST(SplTest, AsIncrementalWithFirst) {
+  // first() returns optional, as_incremental converts it to incremental
+  std::array<int, 3> v{5, 2, 3};
+  std::optional<int> result = spl::apply(v,
+                                         spl::first(),
+                                         spl::as_incremental(),
+                                         spl::transform([](std::optional<int> opt) {
+                                           return opt.value_or(0) * 2;
+                                         }),
+                                         spl::first());
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(*result, 10);  // first is 5, doubled is 10
+}
+
+TEST(SplTest, AsIncrementalWithSort) {
+  // Sort returns complete, as_incremental converts to single item
+  std::array<int, 4> v{3, 1, 4, 2};
+  std::vector<std::vector<int>> result = spl::apply(v,
+                                                     spl::to_vector(),
+                                                     spl::sort(),
+                                                     spl::as_incremental(),
+                                                     spl::to_vector());
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_THAT(result[0], ElementsAre(1, 2, 3, 4));
+}
+
+TEST(SplTest, AsIncrementalConstexpr) {
+  constexpr auto result = []() {
+    std::array<int, 3> v{1, 2, 3};
+    return spl::apply(v,
+                      spl::sum(),
+                      spl::as_incremental(),
+                      spl::transform([](int x) { return x * 3; }),
+                      spl::first()).value();
+  }();
+  static_assert(result == 18);  // sum is 6, tripled is 18
+  EXPECT_EQ(result, 18);
+}
+
+TEST(SplTest, AsIncrementalEmptyInput) {
+  std::array<int, 0> v{};
+  std::vector<int> result = spl::apply(v,
+                                       spl::sum(),
+                                       spl::as_incremental(),
+                                       spl::to_vector());
+  EXPECT_THAT(result, ElementsAre(0));  // sum of empty is 0
+}
+
+TEST(SplTest, AsIncrementalWithCount) {
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+  size_t result = spl::apply(v,
+                             spl::count(),
+                             spl::as_incremental(),
+                             spl::transform([](size_t c) { return c + 100; }),
+                             spl::first()).value();
+  EXPECT_EQ(result, 105);  // count is 5, plus 100 is 105
+}
+

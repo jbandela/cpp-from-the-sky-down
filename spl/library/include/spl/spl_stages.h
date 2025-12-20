@@ -145,6 +145,9 @@ struct generator;
 template<typename R>
 constexpr auto SkydownSplMakeGenerator(R&& r);
 
+// Complete-to-incremental conversion
+inline constexpr auto as_incremental();
+
 // ============================================================================
 // Implementation Details
 // ============================================================================
@@ -1147,6 +1150,29 @@ inline constexpr auto unwrap_optional(){
   return stage<unwrap_impl,
                processing_style::incremental,
                processing_style::incremental, optional_unwrapper<I>>();
+}
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes>
+struct as_incremental_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes>
+struct as_incremental_impl<StageProperties, types<InputTypes...>>
+    : stage_impl<as_incremental_impl<StageProperties, types<InputTypes...>>> {
+  using base = typename as_incremental_impl::base;
+  using output_types = types<InputTypes...>;
+
+  constexpr decltype(auto) process_complete(InputTypes... inputs) {
+    this->next.process_incremental(std::forward<InputTypes>(inputs)...);
+    return this->next.finish();
+  }
+};
+
+inline constexpr auto as_incremental() {
+  return stage<as_incremental_impl,
+               processing_style::complete,
+               processing_style::incremental>();
 }
 
 
