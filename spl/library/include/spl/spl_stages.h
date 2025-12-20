@@ -334,11 +334,12 @@ constexpr auto take(size_t
       );
 
     } else {
-      if (i++ >= n) return false;
+      ++i;
+      if (i > n) return false;
       else {
         output(std::forward<decltype(inputs)>(inputs)...
         );
-        return true;
+        return i < n;
 
       }
     }
@@ -642,7 +643,10 @@ struct group_by_impl<StageProperties,
                                                          processing_style::incremental>(
                                           copy(composed)));
     }
-    iter->second.process_incremental(std::forward<InputTypes>(inputs)...);
+
+    if(!iter->second.done()){
+      iter->second.process_incremental(std::forward<InputTypes>(inputs)...);
+    }
   }
 
   constexpr decltype(auto) finish() {

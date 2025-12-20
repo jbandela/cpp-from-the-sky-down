@@ -179,6 +179,34 @@ TEST(SplTest, GroupBy) {
 
 }
 
+constexpr auto constexpr_group_by_early_done_test() {
+  using pair = std::pair<int, int>;
+  constexpr std::array v{pair{1, 2}, pair{1, 4}, pair{1, 1}};
+
+  int count = 0;
+
+  [[maybe_unused]]auto result = spl::apply(v,
+                    spl::group_by<constexpr_map_factory<>>(&pair::first,
+                                                           spl::transform([&](auto &&p){
+                                                             ++count;
+                                                             return p;
+                                                           }),
+                                                           spl::take(1),
+                                                           spl::count()),
+                    spl::make_pair(),
+                    spl::transform([](auto &&p) { return p.second; }),
+                    spl::first());
+                    return count;
+}
+
+TEST(SplTest, GroupByEarlyDone) {
+  static_assert(
+      constexpr_group_by_early_done_test() == 1); 
+  EXPECT_THAT(constexpr_group_by_early_done_test(), 1);
+}
+
+
+
 constexpr auto constexpr_iota_test() {
 
   return spl::apply(spl::iota(0, 10), spl::sum());
