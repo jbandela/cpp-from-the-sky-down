@@ -4162,3 +4162,100 @@ TEST(SplTest, TransformArgTypeChange) {
   EXPECT_DOUBLE_EQ(std::get<1>(result[1]), 10.0);
 }
 
+// ============================================================================
+// flatten_arg Tests
+// ============================================================================
+
+TEST(SplTest, FlattenArgMiddle) {
+  // Flatten middle arg (index 1) which is a range
+  std::array<int, 2> v1{1, 2};
+  std::array<std::vector<int>, 2> v2{std::vector{10, 11}, std::vector{20, 21}};
+  std::array<int, 2> v3{100, 200};
+
+  std::vector<std::tuple<int, int, int>> result = spl::apply(v1,
+      spl::zip(v2, v3),
+      spl::flatten_arg<1>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 4);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10, 100));
+  EXPECT_EQ(result[1], std::make_tuple(1, 11, 100));
+  EXPECT_EQ(result[2], std::make_tuple(2, 20, 200));
+  EXPECT_EQ(result[3], std::make_tuple(2, 21, 200));
+}
+
+TEST(SplTest, FlattenArgFirst) {
+  // Flatten first arg (index 0)
+  std::array<std::vector<int>, 2> v1{std::vector{1, 2}, std::vector{3, 4}};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::flatten_arg<0>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 4);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(2, 10));
+  EXPECT_EQ(result[2], std::make_tuple(3, 20));
+  EXPECT_EQ(result[3], std::make_tuple(4, 20));
+}
+
+TEST(SplTest, FlattenArgLast) {
+  // Flatten last arg (index 1)
+  std::array<int, 2> v1{1, 2};
+  std::array<std::vector<int>, 2> v2{std::vector{10, 11}, std::vector{20, 21}};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::flatten_arg<1>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 4);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(1, 11));
+  EXPECT_EQ(result[2], std::make_tuple(2, 20));
+  EXPECT_EQ(result[3], std::make_tuple(2, 21));
+}
+
+TEST(SplTest, FlattenArgSingle) {
+  // Single arg stream (flatten a vector of vectors)
+  std::array<std::vector<int>, 2> v{std::vector{1, 2, 3}, std::vector{4, 5}};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_arg<0>(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, FlattenArgEmpty) {
+  // Flatten with empty inner ranges
+  std::array<int, 2> v1{1, 2};
+  std::array<std::vector<int>, 2> v2{std::vector<int>{}, std::vector{20, 21}};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::flatten_arg<1>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(2, 20));
+  EXPECT_EQ(result[1], std::make_tuple(2, 21));
+}
+
+TEST(SplTest, FlattenArgConstexpr) {
+  constexpr int result = []() {
+    std::array<std::array<int, 2>, 2> v{std::array{1, 2}, std::array{3, 4}};
+    return spl::apply(v,
+        spl::flatten_arg<0>(),
+        spl::sum());
+  }();
+  static_assert(result == 10);  // 1+2+3+4
+  EXPECT_EQ(result, 10);
+}
+

@@ -95,6 +95,9 @@ constexpr auto flat_map_arg(F f);
 
 constexpr auto flatten();
 
+template<size_t I>
+constexpr auto flatten_arg();
+
 // Tuple/pair manipulation
 inline constexpr auto expand_tuple();
 inline constexpr auto make_tuple();
@@ -626,6 +629,23 @@ constexpr auto flatten() {
                                   std::forward<decltype(last)>(last));
         },
         std::forward<decltype(inputs)>(inputs)...);
+  });
+}
+
+template<size_t I>
+constexpr auto flatten_arg() {
+  return flat_map_arg<I>([](auto&& out, auto&& before, auto&& arg, auto&& after) {
+    return std::apply([&](auto&&... before_args) {
+      return std::apply([&](auto&&... after_args) {
+        return SkydownSplOutput(as_outputter(out,
+            [&](auto&& out, auto&& item) {
+              return out(std::forward<decltype(before_args)>(before_args)...,
+                         std::forward<decltype(item)>(item),
+                         std::forward<decltype(after_args)>(after_args)...);
+            }),
+            std::forward<decltype(arg)>(arg));
+      }, std::forward<decltype(after)>(after));
+    }, std::forward<decltype(before)>(before));
   });
 }
 
