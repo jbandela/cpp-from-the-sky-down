@@ -3657,14 +3657,14 @@ TEST(SplTest, UnwrapConstPointerSuccess) {
   EXPECT_EQ(*result, 60);
 }
 
-// unwrap_optional<I> tests - unwrap specific argument in multi-arg stream
+// unwrap_optional_arg<I> tests - unwrap specific argument in multi-arg stream
 TEST(SplTest, UnwrapOptionalIndexZeroWithZip) {
   // Unwrap first argument (index 0) which is optional, second arg is plain int
   std::array<std::optional<int>, 3> v1{1, 2, 3};
   std::array<int, 3> v2{10, 20, 30};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<0>(),
+                          spl::unwrap_optional_arg<0>(),
                           spl::transform([](int a, int b) { return a + b; }),
                           spl::sum());
   EXPECT_TRUE(result.has_value());
@@ -3676,7 +3676,7 @@ TEST(SplTest, UnwrapOptionalIndexZeroWithZipFail) {
   std::array<int, 3> v2{10, 20, 30};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<0>(),
+                          spl::unwrap_optional_arg<0>(),
                           spl::transform([](int a, int b) { return a + b; }),
                           spl::sum());
   EXPECT_FALSE(result.has_value());
@@ -3688,7 +3688,7 @@ TEST(SplTest, UnwrapOptionalIndexOneWithZip) {
   std::array<std::optional<int>, 3> v2{10, 20, 30};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int a, int b) { return a + b; }),
                           spl::sum());
   EXPECT_TRUE(result.has_value());
@@ -3700,7 +3700,7 @@ TEST(SplTest, UnwrapOptionalIndexOneWithZipFail) {
   std::array<std::optional<int>, 3> v2{10, std::nullopt, 30};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int a, int b) { return a + b; }),
                           spl::sum());
   EXPECT_FALSE(result.has_value());
@@ -3713,7 +3713,7 @@ TEST(SplTest, UnwrapOptionalIndexZeroPointerWithZip) {
   std::array<int, 3> v2{10, 20, 30};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<0>(),
+                          spl::unwrap_optional_arg<0>(),
                           spl::transform([](int x, int y) { return x * y; }),
                           spl::sum());
   EXPECT_TRUE(result.has_value());
@@ -3726,7 +3726,7 @@ TEST(SplTest, UnwrapOptionalIndexZeroPointerWithZipFail) {
   std::array<int, 3> v2{10, 20, 30};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<0>(),
+                          spl::unwrap_optional_arg<0>(),
                           spl::transform([](int x, int y) { return x * y; }),
                           spl::sum());
   EXPECT_FALSE(result.has_value());
@@ -3738,7 +3738,7 @@ TEST(SplTest, UnwrapOptionalIndexOnePointerWithZip) {
   std::array<int*, 3> v2{&a, &b, &c};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int x, int y) { return x + y; }),
                           spl::sum());
   EXPECT_TRUE(result.has_value());
@@ -3752,7 +3752,7 @@ TEST(SplTest, UnwrapOptionalIndexWithThreeArgs) {
   std::array<int, 3> v3{100, 200, 300};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2, v3),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int a, int b, int c) { return a + b + c; }),
                           spl::sum());
   EXPECT_TRUE(result.has_value());
@@ -3765,7 +3765,7 @@ TEST(SplTest, UnwrapOptionalIndexWithThreeArgsFail) {
   std::array<int, 3> v3{100, 200, 300};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2, v3),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int a, int b, int c) { return a + b + c; }),
                           spl::sum());
   EXPECT_FALSE(result.has_value());
@@ -3778,7 +3778,7 @@ TEST(SplTest, UnwrapOptionalIndexTwoWithThreeArgs) {
   std::array<std::optional<int>, 3> v3{100, 200, 300};
   std::optional<int> result = spl::apply(v1,
                           spl::zip(v2, v3),
-                          spl::unwrap_optional<2>(),
+                          spl::unwrap_optional_arg<2>(),
                           spl::transform([](int a, int b, int c) { return a + b + c; }),
                           spl::sum());
   EXPECT_TRUE(result.has_value());
@@ -3790,7 +3790,7 @@ TEST(SplTest, UnwrapOptionalIndexWithFirst) {
   std::array<std::optional<int>, 3> v2{10, 20, 30};
   std::optional<std::tuple<int, int>> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::make_tuple(),
                           spl::first());
   EXPECT_TRUE(result.has_value());
@@ -3802,7 +3802,7 @@ TEST(SplTest, UnwrapOptionalIndexWithToVector) {
   std::array<std::optional<int>, 3> v2{10, 20, 30};
   std::optional<std::vector<int>> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int a, int b) { return a + b; }),
                           spl::to_vector());
   EXPECT_TRUE(result.has_value());
@@ -3814,7 +3814,7 @@ TEST(SplTest, UnwrapOptionalIndexWithToVectorFail) {
   std::array<std::optional<int>, 3> v2{10, std::nullopt, 30};
   std::optional<std::vector<int>> result = spl::apply(v1,
                           spl::zip(v2),
-                          spl::unwrap_optional<1>(),
+                          spl::unwrap_optional_arg<1>(),
                           spl::transform([](int a, int b) { return a + b; }),
                           spl::to_vector());
   EXPECT_FALSE(result.has_value());

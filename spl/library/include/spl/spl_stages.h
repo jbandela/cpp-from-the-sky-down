@@ -1171,7 +1171,7 @@ inline constexpr auto unwrap_optional(){
 }
 
 template<size_t I>
-inline constexpr auto unwrap_optional(){
+inline constexpr auto unwrap_optional_arg(){
   return stage<unwrap_impl,
                processing_style::incremental,
                processing_style::incremental, optional_unwrapper<I>>();
