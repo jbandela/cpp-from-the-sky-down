@@ -87,6 +87,9 @@ constexpr auto take(size_t n);
 template<typename F>
 constexpr auto flat_map(F f);
 
+template<size_t I, typename F>
+constexpr auto flat_map_arg(F f);
+
 constexpr auto flatten();
 
 // Tuple/pair manipulation
@@ -304,6 +307,28 @@ constexpr auto flat_map(F f) {
 
 }
 
+template<size_t I, typename F>
+constexpr auto flat_map_arg(F f) {
+  return flat_map([f = std::move(f)]<typename Out, typename... Inputs>(Out &&out, Inputs&&... inputs) {
+    auto tuple = std::forward_as_tuple(std::forward<Inputs>(inputs)...);
+
+    auto invoke = [&]<size_t... Before, size_t... After>(std::index_sequence<Before...>, std::index_sequence<After...>) {
+      return std::invoke(f,
+                         std::forward<Out>(out),
+                         std::forward_as_tuple(std::get<Before>(std::move(tuple))...),
+                         std::get<I>(std::move(tuple)),
+                         std::forward_as_tuple(std::get<I + 1 + After>(std::move(tuple))...));
+    };
+
+    if constexpr (calculate_type_v<Out>) {
+      return invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
+    } else {
+      invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
+      return true;
+    }
+  });
+}
+
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
   return flat_map([predicate =
@@ -382,21 +407,18 @@ constexpr auto transform(F f) {
 
 template<size_t I, typename F>
 constexpr auto transform_arg_cps(F f) {
-  return flat_map([f = std::move(f)]<typename Out, typename... Inputs>(Out &&out, Inputs&&... inputs) {
-    auto tuple = std::forward_as_tuple(std::forward<Inputs>(inputs)...);
-
-    auto invoke = [&]<size_t... Before, size_t... After>(std::index_sequence<Before...>, std::index_sequence<After...>) {
+  return flat_map_arg<I>([f = std::move(f)](auto&& out, auto&& before, auto&& arg, auto&& after) {
+    auto invoke = [&] {
       return std::invoke(f,
-                         std::forward<Out>(out),
-                         std::forward_as_tuple(std::get<Before>(std::move(tuple))...),
-                         std::get<I>(std::move(tuple)),
-                         std::forward_as_tuple(std::get<I + 1 + After>(std::move(tuple))...));
+                         std::forward<decltype(out)>(out),
+                         std::forward<decltype(before)>(before),
+                         std::forward<decltype(arg)>(arg),
+                         std::forward<decltype(after)>(after));
     };
-
-    if constexpr (calculate_type_v<Out>) {
-      return invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
+    if constexpr (calculate_type_v<decltype(out)>) {
+      return invoke();
     } else {
-      invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
+      invoke();
       return true;
     }
   });
