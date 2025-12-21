@@ -51,6 +51,9 @@ constexpr auto transform_complete_cps(F f);
 template<size_t I, typename F>
 constexpr auto transform_arg_cps(F f);
 
+template<size_t I, typename F>
+constexpr auto transform_arg(F f);
+
 // Sorting stages
 template<typename Comparator>
 constexpr auto sort(Comparator comp);
@@ -421,6 +424,19 @@ constexpr auto transform_arg_cps(F f) {
       invoke();
       return true;
     }
+  });
+}
+
+template<size_t I, typename F>
+constexpr auto transform_arg(F f) {
+  return transform_arg_cps<I>([f = std::move(f)](auto&& out, auto&& before, auto&& arg, auto&& after) {
+    return std::apply([&](auto&&... before_args) {
+      return std::apply([&](auto&&... after_args) {
+        return out(std::forward<decltype(before_args)>(before_args)...,
+                   std::invoke(f, std::forward<decltype(arg)>(arg)),
+                   std::forward<decltype(after_args)>(after_args)...);
+      }, std::forward<decltype(after)>(after));
+    }, std::forward<decltype(before)>(before));
   });
 }
 

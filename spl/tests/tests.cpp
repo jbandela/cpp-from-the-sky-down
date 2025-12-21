@@ -4066,3 +4066,99 @@ TEST(SplTest, TransformArgCpsExpandArg) {
   EXPECT_EQ(result[1], std::make_tuple(2, 200, 20));
 }
 
+// ============================================================================
+// transform_arg Tests
+// ============================================================================
+
+TEST(SplTest, TransformArgBasic) {
+  // Transform middle arg (index 1) of 3-arg stream
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+  std::array<int, 2> v3{100, 200};
+
+  std::vector<std::tuple<int, int, int>> result = spl::apply(v1,
+      spl::zip(v2, v3),
+      spl::transform_arg<1>([](int x) { return x * 2; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 20, 100));
+  EXPECT_EQ(result[1], std::make_tuple(2, 40, 200));
+}
+
+TEST(SplTest, TransformArgFirst) {
+  // Transform first arg (index 0)
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg<0>([](int x) { return x * 10; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(10, 10));
+  EXPECT_EQ(result[1], std::make_tuple(20, 20));
+}
+
+TEST(SplTest, TransformArgLast) {
+  // Transform last arg (index 1)
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg<1>([](int x) { return x * 10; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 100));
+  EXPECT_EQ(result[1], std::make_tuple(2, 200));
+}
+
+TEST(SplTest, TransformArgSingle) {
+  // Single arg stream
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::transform_arg<0>([](int x) { return x * 2; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(2, 4, 6));
+}
+
+TEST(SplTest, TransformArgConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 2> v1{1, 2};
+    std::array<int, 2> v2{10, 20};
+    return spl::apply(v1,
+        spl::zip(v2),
+        spl::transform_arg<1>([](int x) { return x * 2; }),
+        spl::transform([](int a, int b) { return a + b; }),
+        spl::sum());
+  }();
+  static_assert(result == 63);  // (1+20) + (2+40) = 21 + 42 = 63
+  EXPECT_EQ(result, 63);
+}
+
+TEST(SplTest, TransformArgTypeChange) {
+  // Transform arg to different type
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, double>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg<1>([](int x) { return x * 0.5; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(std::get<0>(result[0]), 1);
+  EXPECT_DOUBLE_EQ(std::get<1>(result[0]), 5.0);
+  EXPECT_EQ(std::get<0>(result[1]), 2);
+  EXPECT_DOUBLE_EQ(std::get<1>(result[1]), 10.0);
+}
+
