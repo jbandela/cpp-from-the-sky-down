@@ -164,6 +164,17 @@ inline constexpr auto as_incremental();
 // Implementation Details
 // ============================================================================
 
+// Category-preserving as_const: lvalue T& -> const T&, rvalue T&& -> const T&&
+template<typename T>
+constexpr std::add_const_t<std::remove_reference_t<T>>& forward_as_const(std::remove_reference_t<T>& t) noexcept {
+  return t;
+}
+
+template<typename T>
+constexpr std::add_const_t<std::remove_reference_t<T>>&& forward_as_const(std::remove_reference_t<T>&& t) noexcept {
+  return static_cast<std::add_const_t<std::remove_reference_t<T>>&&>(t);
+}
+
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename T, typename F>
@@ -639,9 +650,9 @@ constexpr auto flatten_arg() {
       return std::apply([&](auto&&... after_args) {
         return SkydownSplOutput(as_outputter(out,
             [&](auto&& out, auto&& item) {
-              return out(std::forward<decltype(before_args)>(before_args)...,
+              return out(forward_as_const<decltype(before_args)>(before_args)...,
                          std::forward<decltype(item)>(item),
-                         std::forward<decltype(after_args)>(after_args)...);
+                         forward_as_const<decltype(after_args)>(after_args)...);
             }),
             std::forward<decltype(arg)>(arg));
       }, std::forward<decltype(after)>(after));
