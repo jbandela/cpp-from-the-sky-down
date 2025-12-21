@@ -48,6 +48,9 @@ constexpr auto transform_complete(F f);
 template<typename F>
 constexpr auto transform_complete_cps(F f);
 
+template<size_t I, typename F>
+constexpr auto transform_arg_cps(F f);
+
 // Sorting stages
 template<typename Comparator>
 constexpr auto sort(Comparator comp);
@@ -374,6 +377,28 @@ template<typename F>
 constexpr auto transform(F f) {
   return transform_cps([f = std::move(f)](auto &&out, auto &&... inputs) {
     return out(std::invoke(f, std::forward<decltype(inputs)>(inputs)...));
+  });
+}
+
+template<size_t I, typename F>
+constexpr auto transform_arg_cps(F f) {
+  return flat_map([f = std::move(f)]<typename Out, typename... Inputs>(Out &&out, Inputs&&... inputs) {
+    auto tuple = std::forward_as_tuple(std::forward<Inputs>(inputs)...);
+
+    auto invoke = [&]<size_t... Before, size_t... After>(std::index_sequence<Before...>, std::index_sequence<After...>) {
+      return std::invoke(f,
+                         std::forward<Out>(out),
+                         std::forward_as_tuple(std::get<Before>(std::move(tuple))...),
+                         std::get<I>(std::move(tuple)),
+                         std::forward_as_tuple(std::get<I + 1 + After>(std::move(tuple))...));
+    };
+
+    if constexpr (calculate_type_v<Out>) {
+      return invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
+    } else {
+      invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
+      return true;
+    }
   });
 }
 

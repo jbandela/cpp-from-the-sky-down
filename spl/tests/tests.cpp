@@ -3935,3 +3935,134 @@ TEST(SplTest, AsIncrementalWithCount) {
   EXPECT_EQ(result, 105);  // count is 5, plus 100 is 105
 }
 
+// ============================================================================
+// transform_arg_cps Tests
+// ============================================================================
+
+TEST(SplTest, TransformArgCpsBasicMiddleArg) {
+  // 3-arg stream, transform the middle arg (index 1)
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+  std::array<int, 2> v3{100, 200};
+
+  std::vector<std::tuple<int, int, int>> result = spl::apply(v1,
+      spl::zip(v2, v3),
+      spl::transform_arg_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+        // before is tuple<int>, arg is the middle int, after is tuple<int>
+        return out(std::get<0>(before), arg * 2, std::get<0>(after));
+      }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 20, 100));
+  EXPECT_EQ(result[1], std::make_tuple(2, 40, 200));
+}
+
+TEST(SplTest, TransformArgCpsFirstArg) {
+  // Transform first arg (index 0), before tuple is empty
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(before)>> == 0);
+        return out(arg * 10, std::get<0>(after));
+      }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(10, 10));
+  EXPECT_EQ(result[1], std::make_tuple(20, 20));
+}
+
+TEST(SplTest, TransformArgCpsLastArg) {
+  // Transform last arg (index 1 of 2), after tuple is empty
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(after)>> == 0);
+        return out(std::get<0>(before), arg * 10);
+      }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 100));
+  EXPECT_EQ(result[1], std::make_tuple(2, 200));
+}
+
+TEST(SplTest, TransformArgCpsSingleArg) {
+  // Single arg stream, both before and after are empty
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::transform_arg_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(before)>> == 0);
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(after)>> == 0);
+        return out(arg * 2);
+      }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(2, 4, 6));
+}
+
+TEST(SplTest, TransformArgCpsPassThrough) {
+  // Use transform_arg_cps to pass through args unchanged
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{10, 20, 30};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        // Just pass through unchanged
+        return out(arg, std::get<0>(after));
+      }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(2, 20));
+  EXPECT_EQ(result[2], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, TransformArgCpsConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 2> v1{1, 2};
+    std::array<int, 2> v2{10, 20};
+    return spl::apply(v1,
+        spl::zip(v2),
+        spl::transform_arg_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+          return out(std::get<0>(before) + arg);
+        }),
+        spl::sum());
+  }();
+  static_assert(result == 33);  // (1+10) + (2+20) = 33
+  EXPECT_EQ(result, 33);
+}
+
+TEST(SplTest, TransformArgCpsExpandArg) {
+  // Use transform_arg_cps to expand a single arg into multiple
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::transform_arg_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        // Expand first arg into two values
+        return out(arg, arg * 100, std::get<0>(after));
+      }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 100, 10));
+  EXPECT_EQ(result[1], std::make_tuple(2, 200, 20));
+}
+
