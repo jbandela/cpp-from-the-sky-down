@@ -4662,3 +4662,43 @@ TEST(SplTest, CastArgMultiArg) {
   EXPECT_EQ(std::get<1>(result[0]), 10);
 }
 
+TEST(SplTest, ConstructBasic) {
+  std::array<double, 3> v{1.5, 2.5, 3.5};
+
+  // Construct int from double (truncates)
+  auto result = spl::apply(v,
+      spl::construct<int>(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, ConstructFromMultipleArgs) {
+  std::array<int, 2> v1{3, 5};
+  std::array<char, 2> v2{'a', 'b'};
+
+  // Construct string from (count, char) pairs
+  auto result = spl::apply(v1,
+      spl::zip(v2),
+      spl::construct<std::string>(),
+      spl::to_vector());
+
+  EXPECT_EQ(result[0], "aaa");
+  EXPECT_EQ(result[1], "bbbbb");
+}
+
+TEST(SplTest, ConstructPair) {
+  std::array<int, 2> v1{1, 2};
+  std::array<double, 2> v2{1.5, 2.5};
+
+  auto result = spl::apply(v1,
+      spl::zip(v2),
+      spl::construct<std::pair<int, double>>(),
+      spl::to_vector());
+
+  EXPECT_EQ(result[0].first, 1);
+  EXPECT_DOUBLE_EQ(result[0].second, 1.5);
+  EXPECT_EQ(result[1].first, 2);
+  EXPECT_DOUBLE_EQ(result[1].second, 2.5);
+}
+

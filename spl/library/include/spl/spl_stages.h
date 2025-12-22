@@ -139,6 +139,9 @@ constexpr auto cast_arg();
 template<typename T>
 constexpr auto cast();
 
+template<typename T>
+constexpr auto construct();
+
 // Zipping stages
 template<typename F>
 constexpr auto zip_result(F f);
@@ -700,6 +703,13 @@ constexpr auto cast_arg() {
 template<typename T>
 constexpr auto cast() {
   return cast_arg<0, T>();
+}
+
+template<typename T>
+constexpr auto construct() {
+  return transform_cps([](auto&& out, auto&&... inputs) {
+    return out(T(std::forward<decltype(inputs)>(inputs)...));
+  });
 }
 
 template<typename F>
