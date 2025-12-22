@@ -535,25 +535,50 @@ constexpr auto filter_duplicates() {
                processing_style::incremental>();
 }
 
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename F>
+struct transform_cps_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename F>
+struct transform_cps_impl<StageProperties, types<InputTypes...>, F>
+    : stage_impl<transform_cps_impl<StageProperties, types<InputTypes...>, F>> {
+  using base = typename transform_cps_impl::base;
+
+  using output_types = decltype(std::invoke(
+      std::declval<F>(),
+      type_calculating_outputter(),
+      std::declval<InputTypes>()...));
+
+  static_assert(is_types<output_types>::value);
+
+  [[no_unique_address]] F f{};
+
+  constexpr void process_incremental(InputTypes... inputs)
+      requires(incremental_input<transform_cps_impl>) {
+    std::invoke(f,
+                [this](auto&&... outputs) {
+                  this->next.process_incremental(std::forward<decltype(outputs)>(outputs)...);
+                },
+                std::forward<InputTypes>(inputs)...);
+  }
+
+  constexpr decltype(auto) process_complete(InputTypes... inputs)
+      requires(complete_input<transform_cps_impl>) {
+    return std::invoke(f,
+                       [this](auto&&... outputs) -> decltype(auto) {
+                         return this->next.process_complete(std::forward<decltype(outputs)>(outputs)...);
+                       },
+                       std::forward<InputTypes>(inputs)...);
+  }
+};
+
 template<typename F>
 constexpr auto transform_cps(F f) {
-  return flat_map([f = std::move(f)]<typename Out>(Out &&out,
-                                                   auto &&...inputs) {
-
-    auto invoke = [&] {
-      return std::invoke(f,
-                         std::forward<decltype(out)>(out),
-                         std::forward<decltype(inputs)>(inputs)...);
-    };
-    if constexpr (calculate_type_v<Out>) {
-
-      return invoke();
-
-    } else {
-      invoke();
-      return true;
-    }
-  });
+  return stage<transform_cps_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               F>(std::move(f));
 }
 
 template<typename F>
@@ -595,40 +620,9 @@ constexpr auto transform_arg(F f) {
   });
 }
 
-// Forward declaration
-template<typename StageProperties, typename InputTypes, typename F>
-struct transform_complete_cps_impl;
-
-// Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes, typename F>
-struct transform_complete_cps_impl<StageProperties, types<InputTypes...>, F>
-    : stage_impl<transform_complete_cps_impl<StageProperties,
-                                             types<InputTypes...>,
-                                             F>> {
-  using base = typename transform_complete_cps_impl::base;
-
-  using output_types = decltype(std::invoke(
-      std::declval<F>(),
-      type_calculating_outputter(),
-      std::declval<InputTypes>()...));
-
-  static_assert(is_types<output_types>::value);
-
-  [[no_unique_address]] F f{};
-
-  constexpr decltype(auto) process_complete(InputTypes... inputs) {
-    return std::invoke(f,
-                       [this](auto &&... outputs) -> decltype(auto) {
-                         return this->next.process_complete(std::forward<
-                             decltype(outputs)>(outputs)...);
-                       },
-                       std::forward<InputTypes>(inputs)...);
-  }
-};
-
 template<typename F>
 constexpr auto transform_complete_cps(F f) {
-  return stage<transform_complete_cps_impl,
+  return stage<transform_cps_impl,
                processing_style::complete,
                processing_style::complete,
                F>(std::move(f));
