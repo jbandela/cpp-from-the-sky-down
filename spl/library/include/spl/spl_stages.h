@@ -86,6 +86,14 @@ constexpr auto filter(Predicate predicate);
 
 constexpr auto take(size_t n);
 
+template<typename Predicate>
+constexpr auto take_while(Predicate predicate);
+
+constexpr auto skip(size_t n);
+
+template<typename Predicate>
+constexpr auto skip_while(Predicate predicate);
+
 constexpr auto filter_duplicates();
 
 // Flattening and mapping stages
@@ -420,6 +428,63 @@ constexpr auto take(size_t
         return i < n;
 
       }
+    }
+  });
+}
+
+template<typename Predicate>
+constexpr auto take_while(Predicate predicate) {
+  return flat_map([predicate = std::move(predicate),
+                   done = false]<typename Out>(
+      Out&& output,
+      auto&&... inputs
+  ) mutable {
+    if constexpr (calculate_type_v<Out>) {
+      return output(std::forward<decltype(inputs)>(inputs)...);
+    } else {
+      if (done) return false;
+      if (done = !std::invoke(predicate, std::as_const(inputs)...); !done) {
+        output(std::forward<decltype(inputs)>(inputs)...);
+      }
+      return !done;
+    }
+  });
+}
+
+constexpr auto skip(size_t n) {
+  return flat_map([i = size_t(0), n]<typename Out>(
+      Out&& output,
+      auto&&... inputs
+  ) mutable {
+    if constexpr (calculate_type_v<Out>) {
+      return output(std::forward<decltype(inputs)>(inputs)...);
+    } else {
+      if (i < n) {
+        ++i;
+        return true;
+      }
+      output(std::forward<decltype(inputs)>(inputs)...);
+      return true;
+    }
+  });
+}
+
+template<typename Predicate>
+constexpr auto skip_while(Predicate predicate) {
+  return flat_map([predicate = std::move(predicate),
+                   skipping = true]<typename Out>(
+      Out&& output,
+      auto&&... inputs
+  ) mutable {
+    if constexpr (calculate_type_v<Out>) {
+      return output(std::forward<decltype(inputs)>(inputs)...);
+    } else {
+      if (skipping && std::invoke(predicate, std::as_const(inputs)...)) {
+        return true;
+      }
+      skipping = false;
+      output(std::forward<decltype(inputs)>(inputs)...);
+      return true;
     }
   });
 }

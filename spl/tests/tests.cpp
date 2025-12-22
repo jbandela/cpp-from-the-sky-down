@@ -4357,3 +4357,179 @@ TEST(SplTest, FilterDuplicatesConstexpr) {
   EXPECT_EQ(result, 6);
 }
 
+// ============================================================================
+// take_while Tests
+// ============================================================================
+
+TEST(SplTest, TakeWhileBasic) {
+  std::array<int, 6> v{1, 2, 3, 4, 5, 6};
+
+  std::vector<int> result = spl::apply(v,
+      spl::take_while([](int x) { return x < 4; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, TakeWhileAllPass) {
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::take_while([](int x) { return x < 10; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4));
+}
+
+TEST(SplTest, TakeWhileNonePass) {
+  std::array<int, 4> v{5, 6, 7, 8};
+
+  std::vector<int> result = spl::apply(v,
+      spl::take_while([](int x) { return x < 5; }),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, TakeWhileEmpty) {
+  std::array<int, 0> v{};
+
+  std::vector<int> result = spl::apply(v,
+      spl::take_while([](int x) { return x < 10; }),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, TakeWhileConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 6> v{1, 2, 3, 4, 5, 6};
+    return spl::apply(v,
+        spl::take_while([](int x) { return x < 4; }),
+        spl::sum());
+  }();
+  static_assert(result == 6);  // 1+2+3
+  EXPECT_EQ(result, 6);
+}
+
+// ============================================================================
+// skip Tests
+// ============================================================================
+
+TEST(SplTest, SkipBasic) {
+  std::array<int, 6> v{1, 2, 3, 4, 5, 6};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip(3),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(4, 5, 6));
+}
+
+TEST(SplTest, SkipZero) {
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip(0),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4));
+}
+
+TEST(SplTest, SkipAll) {
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip(4),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, SkipMoreThanSize) {
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip(10),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, SkipConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 6> v{1, 2, 3, 4, 5, 6};
+    return spl::apply(v,
+        spl::skip(3),
+        spl::sum());
+  }();
+  static_assert(result == 15);  // 4+5+6
+  EXPECT_EQ(result, 15);
+}
+
+// ============================================================================
+// skip_while Tests
+// ============================================================================
+
+TEST(SplTest, SkipWhileBasic) {
+  std::array<int, 6> v{1, 2, 3, 4, 5, 6};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip_while([](int x) { return x < 4; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(4, 5, 6));
+}
+
+TEST(SplTest, SkipWhileAllPass) {
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip_while([](int x) { return x < 10; }),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, SkipWhileNonePass) {
+  std::array<int, 4> v{5, 6, 7, 8};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip_while([](int x) { return x < 5; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(5, 6, 7, 8));
+}
+
+TEST(SplTest, SkipWhileEmpty) {
+  std::array<int, 0> v{};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip_while([](int x) { return x < 10; }),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, SkipWhileDoesNotRestart) {
+  // Once skipping stops, it shouldn't restart even if predicate would pass again
+  std::array<int, 6> v{1, 2, 5, 1, 2, 6};
+
+  std::vector<int> result = spl::apply(v,
+      spl::skip_while([](int x) { return x < 5; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(5, 1, 2, 6));
+}
+
+TEST(SplTest, SkipWhileConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 6> v{1, 2, 3, 4, 5, 6};
+    return spl::apply(v,
+        spl::skip_while([](int x) { return x < 4; }),
+        spl::sum());
+  }();
+  static_assert(result == 15);  // 4+5+6
+  EXPECT_EQ(result, 15);
+}
+
