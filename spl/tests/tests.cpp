@@ -4259,3 +4259,101 @@ TEST(SplTest, FlattenArgConstexpr) {
   EXPECT_EQ(result, 10);
 }
 
+// ============================================================================
+// filter_duplicates Tests
+// ============================================================================
+
+TEST(SplTest, FilterDuplicatesBasic) {
+  // Remove consecutive duplicates
+  std::array<int, 7> v{1, 1, 2, 2, 2, 3, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_duplicates(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, FilterDuplicatesNoDuplicates) {
+  // No duplicates to remove
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_duplicates(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4));
+}
+
+TEST(SplTest, FilterDuplicatesAllSame) {
+  // All same values
+  std::array<int, 5> v{7, 7, 7, 7, 7};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_duplicates(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(7));
+}
+
+TEST(SplTest, FilterDuplicatesEmpty) {
+  // Empty input
+  std::array<int, 0> v{};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_duplicates(),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, FilterDuplicatesSingle) {
+  // Single element
+  std::array<int, 1> v{42};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_duplicates(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(42));
+}
+
+TEST(SplTest, FilterDuplicatesNonConsecutive) {
+  // Non-consecutive duplicates are kept (like std::unique)
+  std::array<int, 5> v{1, 2, 1, 2, 1};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_duplicates(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 1, 2, 1));
+}
+
+TEST(SplTest, FilterDuplicatesMultiArg) {
+  // Multi-arg stream with zip
+  std::array<int, 5> v1{1, 1, 2, 2, 3};
+  std::array<int, 5> v2{10, 10, 20, 20, 30};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_duplicates(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(2, 20));
+  EXPECT_EQ(result[2], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, FilterDuplicatesConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 7> v{1, 1, 2, 2, 2, 3, 3};
+    return spl::apply(v,
+        spl::filter_duplicates(),
+        spl::sum());
+  }();
+  static_assert(result == 6);  // 1+2+3
+  EXPECT_EQ(result, 6);
+}
+

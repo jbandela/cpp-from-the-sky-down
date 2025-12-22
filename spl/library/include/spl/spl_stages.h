@@ -86,6 +86,8 @@ constexpr auto filter(Predicate predicate);
 
 constexpr auto take(size_t n);
 
+constexpr auto filter_duplicates();
+
 // Flattening and mapping stages
 template<typename F>
 constexpr auto flat_map(F f);
@@ -175,6 +177,34 @@ constexpr std::add_const_t<std::remove_reference_t<T>>&& forward_as_const(std::r
   return static_cast<std::add_const_t<std::remove_reference_t<T>>&&>(t);
 }
 
+// Storage that preserves memory model: lvalues stored as references, rvalues stored by value
+template<typename T>
+struct value_storage {
+  // For lvalues: store as pointer (reference semantics)
+  std::remove_reference_t<T>* ptr_;
+
+  constexpr value_storage(T& value) : ptr_(&value) {}
+
+  constexpr decltype(auto) operator*() const { return *ptr_; }
+
+  constexpr bool operator==(const std::remove_reference_t<T>& other) const {
+    return *ptr_ == other;
+  }
+};
+
+template<typename T>
+struct value_storage<T&&> {
+  // For rvalues: store by value, dropping const since we're making a copy
+  std::remove_cvref_t<T> value_;
+
+  constexpr value_storage(T&& value) : value_(std::move(value)) {}
+
+  constexpr std::remove_cvref_t<T>&& operator*() { return std::move(value_); }
+
+  constexpr bool operator==(const std::remove_cvref_t<T>& other) const {
+    return value_ == other;
+  }
+};
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename T, typename F>
@@ -392,6 +422,52 @@ constexpr auto take(size_t
       }
     }
   });
+}
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes>
+struct filter_duplicates_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes>
+struct filter_duplicates_impl<StageProperties, types<InputTypes...>>
+    : stage_impl<filter_duplicates_impl<StageProperties, types<InputTypes...>>> {
+  using base = typename filter_duplicates_impl::base;
+  using output_types = types<InputTypes...>;
+  using storage_type = std::tuple<value_storage<InputTypes>...>;
+
+  std::optional<storage_type> stored_;
+
+  constexpr void process_incremental(InputTypes... inputs) {
+    if (stored_.has_value()) {
+      // Compare stored values with incoming values using std::tie
+      if (stored_.value() == std::tie(inputs...)) {
+        // Same as previous, skip
+        return;
+      }
+      // Different, output the previously stored value
+      std::apply([&](auto&... stored) {
+        this->next.process_incremental(*stored...);
+      }, stored_.value());
+    }
+    // Store the new value
+    stored_.emplace(value_storage<InputTypes>(std::forward<InputTypes>(inputs))...);
+  }
+
+  constexpr decltype(auto) finish() {
+    if (stored_.has_value()) {
+      std::apply([&](auto&... stored) {
+        this->next.process_incremental(*stored...);
+      }, stored_.value());
+    }
+    return this->next.finish();
+  }
+};
+
+constexpr auto filter_duplicates() {
+  return stage<filter_duplicates_impl,
+               processing_style::incremental,
+               processing_style::incremental>();
 }
 
 template<typename F>
