@@ -113,6 +113,32 @@ inline constexpr auto expand_tuple();
 inline constexpr auto make_tuple();
 inline constexpr auto make_pair();
 
+// Value manipulation stages
+template<size_t I>
+constexpr auto ref_arg();
+inline constexpr auto ref();
+
+template<size_t I>
+constexpr auto move_arg();
+inline constexpr auto move();
+
+template<size_t I>
+constexpr auto lref_arg();
+inline constexpr auto lref();
+
+template<size_t I>
+constexpr auto deref_arg();
+inline constexpr auto deref();
+
+template<size_t I>
+constexpr auto addressof_arg();
+inline constexpr auto addressof();
+
+template<size_t I, typename T>
+constexpr auto cast_arg();
+template<typename T>
+constexpr auto cast();
+
 // Zipping stages
 template<typename F>
 constexpr auto zip_result(F f);
@@ -618,6 +644,62 @@ constexpr auto transform_arg(F f) {
       }, std::forward<decltype(after)>(after));
     }, std::forward<decltype(before)>(before));
   });
+}
+
+// Value manipulation stages
+template<size_t I>
+constexpr auto ref_arg() {
+  return transform_arg<I>([](auto&& arg) { return std::ref(arg); });
+}
+
+inline constexpr auto ref() {
+  return ref_arg<0>();
+}
+
+template<size_t I>
+constexpr auto move_arg() {
+  return transform_arg<I>([](auto&& arg) -> decltype(auto) { return std::move(arg); });
+}
+
+inline constexpr auto move() {
+  return move_arg<0>();
+}
+
+template<size_t I>
+constexpr auto lref_arg() {
+  return transform_arg<I>([](auto&& arg) -> decltype(auto) { return static_cast<std::remove_reference_t<decltype(arg)>&>(arg); });
+}
+
+inline constexpr auto lref() {
+  return lref_arg<0>();
+}
+
+template<size_t I>
+constexpr auto deref_arg() {
+  return transform_arg<I>([](auto&& arg) -> decltype(auto) { return *std::forward<decltype(arg)>(arg); });
+}
+
+inline constexpr auto deref() {
+  return deref_arg<0>();
+}
+
+template<size_t I>
+constexpr auto addressof_arg() {
+  return transform_arg<I>([](auto&& arg) { return std::addressof(arg); });
+}
+
+inline constexpr auto addressof() {
+  return addressof_arg<0>();
+}
+
+template<size_t I, typename T>
+constexpr auto cast_arg() {
+  return transform_arg<I>([](auto&& arg) -> T { return static_cast<T>(std::forward<decltype(arg)>(arg)); });
+}
+
+template<typename T>
+constexpr auto cast() {
+  return cast_arg<0, T>();
 }
 
 template<typename F>

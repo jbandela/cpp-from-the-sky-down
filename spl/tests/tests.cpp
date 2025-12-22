@@ -4533,3 +4533,132 @@ TEST(SplTest, SkipWhileConstexpr) {
   EXPECT_EQ(result, 15);
 }
 
+// ============================================================================
+// Value Manipulation Stage Tests
+// ============================================================================
+
+TEST(SplTest, RefBasic) {
+  std::array<int, 3> v{1, 2, 3};
+
+  // ref creates std::reference_wrapper
+  auto result = spl::apply(v,
+      spl::ref(),
+      spl::to_vector());
+
+  static_assert(std::is_same_v<decltype(result)::value_type, std::reference_wrapper<int>>);
+  EXPECT_EQ(result[0].get(), 1);
+  EXPECT_EQ(result[1].get(), 2);
+  EXPECT_EQ(result[2].get(), 3);
+
+  // Modifying through ref modifies original
+  result[0].get() = 100;
+  EXPECT_EQ(v[0], 100);
+}
+
+TEST(SplTest, RefArgMultiArg) {
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  // ref_arg<1> wraps the second argument
+  int sum = 0;
+  (void)spl::apply(v1,
+      spl::zip(v2),
+      spl::ref_arg<1>(),
+      spl::for_each([&sum](int a, std::reference_wrapper<int> b) {
+        sum += a + b.get();
+      }));
+
+  EXPECT_EQ(sum, 1 + 10 + 2 + 20);
+}
+
+TEST(SplTest, MoveBasic) {
+  std::array<std::string, 2> v{"hello", "world"};
+
+  auto result = spl::apply(std::move(v),
+      spl::move(),
+      spl::to_vector());
+
+  EXPECT_EQ(result[0], "hello");
+  EXPECT_EQ(result[1], "world");
+}
+
+TEST(SplTest, LrefBasic) {
+  std::array<int, 3> v{1, 2, 3};
+
+  // lref forces lvalue reference
+  int sum = 0;
+  spl::apply(v,
+      spl::lref(),
+      spl::for_each([&sum](int& x) { sum += x; x *= 2; }));
+
+  EXPECT_EQ(sum, 6);
+  EXPECT_EQ(v[0], 2);
+  EXPECT_EQ(v[1], 4);
+  EXPECT_EQ(v[2], 6);
+}
+
+TEST(SplTest, DerefBasic) {
+  int a = 1, b = 2, c = 3;
+  std::array<int*, 3> v{&a, &b, &c};
+
+  auto result = spl::apply(v,
+      spl::deref(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, DerefArgMultiArg) {
+  int a = 10, b = 20;
+  std::array<int, 2> v1{1, 2};
+  std::array<int*, 2> v2{&a, &b};
+
+  auto result = spl::apply(v1,
+      spl::zip(v2),
+      spl::deref_arg<1>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(std::get<0>(result[0]), 1);
+  EXPECT_EQ(std::get<1>(result[0]), 10);
+}
+
+TEST(SplTest, AddressofBasic) {
+  std::array<int, 3> v{1, 2, 3};
+
+  auto result = spl::apply(v,
+      spl::addressof(),
+      spl::to_vector());
+
+  EXPECT_EQ(result[0], &v[0]);
+  EXPECT_EQ(result[1], &v[1]);
+  EXPECT_EQ(result[2], &v[2]);
+}
+
+TEST(SplTest, CastBasic) {
+  std::array<int, 3> v{1, 2, 3};
+
+  auto result = spl::apply(v,
+      spl::cast<double>(),
+      spl::to_vector());
+
+  static_assert(std::is_same_v<decltype(result)::value_type, double>);
+  EXPECT_DOUBLE_EQ(result[0], 1.0);
+  EXPECT_DOUBLE_EQ(result[1], 2.0);
+  EXPECT_DOUBLE_EQ(result[2], 3.0);
+}
+
+TEST(SplTest, CastArgMultiArg) {
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  auto result = spl::apply(v1,
+      spl::zip(v2),
+      spl::cast_arg<0, double>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_DOUBLE_EQ(std::get<0>(result[0]), 1.0);
+  EXPECT_EQ(std::get<1>(result[0]), 10);
+}
+
