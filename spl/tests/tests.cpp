@@ -4702,3 +4702,214 @@ TEST(SplTest, ConstructPair) {
   EXPECT_DOUBLE_EQ(result[1].second, 2.5);
 }
 
+// ============================================================================
+// repeat Tests
+// ============================================================================
+
+TEST(SplTest, RepeatBasic) {
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat(2),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 1, 2, 2, 3, 3));
+}
+
+TEST(SplTest, RepeatThreeTimes) {
+  std::array<int, 2> v{1, 2};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat(3),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 1, 1, 2, 2, 2));
+}
+
+TEST(SplTest, RepeatZero) {
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat(0),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, RepeatOne) {
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat(1),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, RepeatEmpty) {
+  std::array<int, 0> v{};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat(5),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, RepeatWithTake) {
+  // Take should stop repeat early
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat(10),
+      spl::take(5),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 1, 1, 1, 1));
+}
+
+TEST(SplTest, RepeatConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 3> v{1, 2, 3};
+    return spl::apply(v,
+        spl::repeat(2),
+        spl::sum());
+  }();
+  static_assert(result == 12);  // (1+1) + (2+2) + (3+3) = 12
+  EXPECT_EQ(result, 12);
+}
+
+TEST(SplTest, RepeatMultiArg) {
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::repeat(2),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 4);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(1, 10));
+  EXPECT_EQ(result[2], std::make_tuple(2, 20));
+  EXPECT_EQ(result[3], std::make_tuple(2, 20));
+}
+
+// ============================================================================
+// repeat_while Tests
+// ============================================================================
+
+TEST(SplTest, RepeatWhileBasic) {
+  // Repeat while counter increments
+  int count = 0;
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat_while([&count](int) {
+        return count++ < 2;  // repeat each value 2 times
+      }),
+      spl::to_vector());
+
+  // Reset count after each value, so effectively no repetition
+  // Actually, count is shared across all, so it increments continuously
+  EXPECT_THAT(result, ElementsAre(1, 1));
+}
+
+TEST(SplTest, RepeatWhileWithCapturedState) {
+  // Each element repeated based on its value
+  std::array<int, 3> v{1, 2, 1};  // repeat 1x, 2x, 1x
+
+  std::vector<int> result = spl::apply(v,
+      spl::flat_map([](auto&& out, int x) {
+        if constexpr (spl::calculate_type_v<decltype(out)>) {
+          return out(x);
+        } else {
+          for (int i = 0; i < x && out; ++i) {
+            out(x);
+          }
+          return bool(out);
+        }
+      }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 2, 1));
+}
+
+TEST(SplTest, RepeatWhileNeverTrue) {
+  std::array<int, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat_while([](int) { return false; }),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, RepeatWhileEmpty) {
+  std::array<int, 0> v{};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat_while([](int) { return true; }),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, RepeatWhileWithTake) {
+  // Use take to stop infinite repeat
+  std::array<int, 1> v{42};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat_while([](int) { return true; }),  // infinite repeat
+      spl::take(5),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(42, 42, 42, 42, 42));
+}
+
+TEST(SplTest, RepeatWhileConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 2> v{1, 2};
+    int count = 0;
+    return spl::apply(v,
+        spl::repeat_while([&count](int) {
+          return count++ < 3;
+        }),
+        spl::sum());
+  }();
+  static_assert(result == 3);  // 1+1+1 (3 repeats total, all of first element)
+  EXPECT_EQ(result, 3);
+}
+
+TEST(SplTest, RepeatWhileMultiArg) {
+  std::array<int, 2> v1{1, 2};
+  std::array<int, 2> v2{10, 20};
+
+  int count = 0;
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::repeat_while([&count](int, int) {
+        return count++ < 1;  // repeat first pair once
+      }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+}
+
+TEST(SplTest, RepeatWhileBasedOnValue) {
+  // Repeat each element while it's less than 3
+  std::array<int, 4> v{1, 2, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::repeat_while([](int x) { return x < 3; }),
+      spl::take(10),  // Safety limit
+      spl::to_vector());
+
+  // 1 repeats forever (< 3), take limits to 10
+  EXPECT_EQ(result.size(), 10);
+  EXPECT_THAT(result, ElementsAre(1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+}
+

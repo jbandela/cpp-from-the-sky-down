@@ -96,6 +96,11 @@ constexpr auto skip_while(Predicate predicate);
 
 constexpr auto filter_duplicates();
 
+constexpr auto repeat(size_t n);
+
+template<typename Predicate>
+constexpr auto repeat_while(Predicate predicate);
+
 // Flattening and mapping stages
 template<typename F>
 constexpr auto flat_map(F f);
@@ -514,6 +519,39 @@ constexpr auto skip_while(Predicate predicate) {
       skipping = false;
       output(std::forward<decltype(inputs)>(inputs)...);
       return true;
+    }
+  });
+}
+
+constexpr auto repeat(size_t n) {
+  return flat_map([n]<typename Out>(
+      Out&& output,
+      auto&&... inputs
+  ) {
+    if constexpr (calculate_type_v<Out>) {
+      return output(forward_as_const<decltype(inputs)>(inputs)...);
+    } else {
+      for (size_t i = 0; i < n && output; ++i) {
+        output(forward_as_const<decltype(inputs)>(inputs)...);
+      }
+      return bool(output);
+    }
+  });
+}
+
+template<typename Predicate>
+constexpr auto repeat_while(Predicate predicate) {
+  return flat_map([predicate = std::move(predicate)]<typename Out>(
+      Out&& output,
+      auto&&... inputs
+  ) {
+    if constexpr (calculate_type_v<Out>) {
+      return output(forward_as_const<decltype(inputs)>(inputs)...);
+    } else {
+      while (output && std::invoke(predicate, std::as_const(inputs)...)) {
+        output(forward_as_const<decltype(inputs)>(inputs)...);
+      }
+      return bool(output);
     }
   });
 }
