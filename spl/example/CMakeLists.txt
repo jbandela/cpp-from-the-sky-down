@@ -35,3 +35,6 @@ target_link_libraries(example_optional PRIVATE Skydown::spl)
 
 add_executable(example_generators example_generators.cpp)
 target_link_libraries(example_generators PRIVATE Skydown::spl)
+
+add_executable(example_pythagorean example_pythagorean.cpp)
+target_link_libraries(example_pythagorean PRIVATE Skydown::spl)

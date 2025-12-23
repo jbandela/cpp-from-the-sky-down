@@ -76,7 +76,7 @@ int main() {
     std::cout << "\n=== Tee (Parallel Processing) ===\n";
     std::vector<int> values = {1, 2, 3, 4, 5};
 
-    spl::apply(values,
+    [[maybe_unused]] auto result = spl::apply(values,
         spl::tee(
             spl::sum(),
             spl::compose(spl::transform([](int x) { return x * x; }), spl::sum()),

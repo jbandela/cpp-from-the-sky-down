@@ -6,6 +6,7 @@
 #include <vector>
 #include <optional>
 #include <string>
+#include <cmath>
 
 // Simulate a function that might fail
 std::optional<int> safe_divide(int a, int b) {
