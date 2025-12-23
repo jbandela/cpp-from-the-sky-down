@@ -16,8 +16,6 @@ namespace spl {
 template<typename T, typename F>
 constexpr auto accumulate_in_place(T t, F f);
 
-template<typename TypeCalculator, typename F>
-constexpr auto accumulate_in_place_with_type_calculator(TypeCalculator t, F f);
 
 template<typename T, typename F>
 constexpr auto accumulate(T t, F f);
@@ -269,24 +267,25 @@ struct value_storage<T&&> {
 };
 
 // Forward declaration
-template<typename StageProperties, typename InputTypes, typename T, typename F>
+template<typename StageProperties, typename InputTypes, typename Init, typename F>
 struct accumulate_in_place_impl;
 
 // Partial specialization to extract types from types<...>
-template<typename StageProperties, typename... InputTypes, typename T, typename F>
-struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
+template<typename StageProperties, typename... InputTypes, typename Init, typename F>
+struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, Init, F>
     : stage_impl<accumulate_in_place_impl<StageProperties,
                                           types<InputTypes...>,
-                                          T,
+                                          Init,
                                           F>> {
   using base = typename accumulate_in_place_impl::base;
-  using accumulated_type = std::remove_cvref_t<first_type_t<std::invoke_result_t<
-      T,
-      types<InputTypes...>>>>;
+  using accumulated_type = std::invoke_result_t<
+      Init,
+      types<InputTypes...>>;
   static_assert(!std::is_same_v<accumulated_type, void>);
   using output_types = types<accumulated_type &&>;
+  [[no_unique_address]] Init init;
   [[no_unique_address]] F f{};
-  [[no_unique_address]] accumulated_type accumulated{};
+  [[no_unique_address]] accumulated_type accumulated = std::invoke(init,types<InputTypes...>());
 
   constexpr decltype(auto) process_incremental(InputTypes... inputs) {
     std::invoke(f, accumulated, std::forward<InputTypes>(inputs)...);
@@ -298,30 +297,21 @@ struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, T, F>
 
 };
 
-template<typename T, typename F>
-constexpr auto accumulate_in_place(T t, F f) {
-  constexpr auto type_calculator = [](auto) { return types<T>(); };
-  return stage<accumulate_in_place_impl,
-               processing_style::incremental,
-               processing_style::complete,
-               decltype(type_calculator),
-               F>(
-      std::move(f), std::move(t));
-}
 
-template<typename TypeCalculator, typename F>
-constexpr auto accumulate_in_place_with_type_calculator(TypeCalculator t, F f) {
+template<typename Init, typename F>
+constexpr auto accumulate_in_place_with_init(Init init, F f) {
   return stage<accumulate_in_place_impl,
-               processing_style::incremental,
-               processing_style::complete,
-               TypeCalculator,
-               F>(std::move(f));
+              processing_style::incremental,
+              processing_style::complete,
+              decltype(init),
+              F>(
+     std::move(init), std::move(f));
 }
 
 template<typename T, typename F>
-requires(std::is_invocable_v<T, types<int &&>>)
 constexpr auto accumulate_in_place(T t, F f) {
-  return accumulate_in_place_with_type_calculator(std::move(t), std::move(f));
+  auto init = [t = std::move(t)](auto) mutable { return std::move(t); };
+  return accumulate_in_place_with_init(std::move(init), std::move(f));
 }
 
 template<typename T, typename F>
@@ -339,10 +329,10 @@ constexpr auto accumulate(T t, F f) {
 
 template<typename F>
 constexpr auto accumulate(F f) {
-  return accumulate_in_place([]<typename... Types>(types<Types...>) {
-                               static_assert(sizeof...(Types) == 1,
-                                             "Accumulate needs to only have one input");
-                               return types<std::remove_cvref_t<Types>...>();
+  return accumulate_in_place_with_init([]<typename T, typename... Types>(types<T,Types...>) {
+                               static_assert(sizeof...(Types) == 0,
+                                             "Accumulate without an explicit init needs to only have one input");
+                               return std::remove_cvref_t<T>();
                              },
                              [f = std::move(f)](auto &accumulated,
                                                 auto &&v) {
@@ -993,14 +983,13 @@ inline constexpr auto flatten_optional() {
 
 template<template<typename...> typename C>
 constexpr auto push_back_to() {
-  return accumulate_in_place([]<typename... Inputs>(types<Inputs...>) {
+  return accumulate_in_place_with_init([]<typename... Inputs>(types<Inputs...>) {
     static_assert(sizeof...(Inputs) == 1,
                   "push_back_to can only take 1 input argument");
-    return types<C<std::remove_cvref_t<first_type_t<types<Inputs...>>>>>();
+    return C<std::remove_cvref_t<first_type_t<types<Inputs...>>>>{};
   }, [](auto &c, auto &&v) {
     c.push_back(std::forward<decltype(v)>(v));
   });
-
 }
 
 constexpr auto to_vector() {
@@ -1009,10 +998,9 @@ constexpr auto to_vector() {
 
 template<template<typename, typename> typename MapType>
 constexpr auto to_map() {
-  return accumulate_in_place_with_type_calculator([]<typename... Inputs>(types<
-      Inputs...>) {
+  return accumulate_in_place_with_init([]<typename... Inputs>(types<Inputs...>) {
     static_assert(sizeof...(Inputs) == 2, "to_map needs 2 input arguments");
-    return types<MapType<std::remove_cvref_t<Inputs>...>>();
+    return MapType<std::remove_cvref_t<Inputs>...>{};
   }, [](auto &m, auto &&... args) {
     m.emplace(std::forward<decltype(args)>(args)...);
   });
@@ -1474,8 +1462,8 @@ template<typename... Types>
 using single_type_or_tuple_t = typename single_type_or_tuple<Types...>::type;
 
 constexpr inline auto last(){
-  return accumulate_in_place([]<typename... InputTypes>(types<InputTypes...>) {
-    return types<std::optional<single_type_or_tuple_t<std::remove_cvref_t<InputTypes>...>>>();
+  return accumulate_in_place_with_init([]<typename... InputTypes>(types<InputTypes...>) {
+    return std::optional<single_type_or_tuple_t<std::remove_cvref_t<InputTypes>...>>{};
  }, [](auto &acc, auto &&... args) {
     acc.emplace(std::forward<decltype(args)>(args)...);
   });
@@ -1487,11 +1475,11 @@ constexpr inline auto first(){
 
 template<typename Comp>
 constexpr auto min(Comp comp){
-  return accumulate_in_place([]<typename... InputTypes>(types<InputTypes...>) {
+  return accumulate_in_place_with_init([]<typename... InputTypes>(types<InputTypes...>) {
     static_assert(sizeof...(InputTypes) == 1, "Cannot have max/min on multi-argument stream");
-    return types<std::optional<std::remove_cvref_t<InputTypes>...>>();
+    return std::optional<std::remove_cvref_t<InputTypes>...>{};
  }, [comp = std::move(comp)](auto &acc, auto &&... args) {
-    if(!acc.has_value() || comp(std::as_const(args)...,acc)){
+    if(!acc.has_value() || comp(std::as_const(args)..., *acc)){
       acc.emplace(std::forward<decltype(args)>(args)...);
     }
   });
