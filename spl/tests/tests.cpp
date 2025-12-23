@@ -5456,3 +5456,158 @@ TEST(SplTest, ChunkWithStrings) {
   EXPECT_THAT(result[2], ElementsAre("e"));
 }
 
+// Additional constexpr tests for stages missing them
+
+constexpr auto constexpr_sum_test2() {
+  constexpr std::array<int, 5> v{1, 2, 3, 4, 5};
+  return spl::apply(v, spl::sum());
+}
+
+TEST(SplTest, SumConstexpr) {
+  static_assert(constexpr_sum_test2() == 15);
+  EXPECT_EQ(constexpr_sum_test2(), 15);
+}
+
+constexpr auto constexpr_first_test2() {
+  constexpr std::array<int, 5> v{10, 20, 30, 40, 50};
+  return spl::apply(v, spl::first());
+}
+
+TEST(SplTest, FirstConstexpr) {
+  static_assert(constexpr_first_test2() == 10);
+  EXPECT_EQ(constexpr_first_test2(), 10);
+}
+
+constexpr auto constexpr_last_test2() {
+  constexpr std::array<int, 5> v{10, 20, 30, 40, 50};
+  return spl::apply(v, spl::last());
+}
+
+TEST(SplTest, LastConstexpr) {
+  static_assert(constexpr_last_test2() == 50);
+  EXPECT_EQ(constexpr_last_test2(), 50);
+}
+
+constexpr auto constexpr_transform_test2() {
+  constexpr std::array<int, 5> v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+      spl::transform([](int x) { return x * 2; }),
+      spl::sum());
+}
+
+TEST(SplTest, TransformConstexpr) {
+  // 2 + 4 + 6 + 8 + 10 = 30
+  static_assert(constexpr_transform_test2() == 30);
+  EXPECT_EQ(constexpr_transform_test2(), 30);
+}
+
+constexpr auto constexpr_filter_test2() {
+  constexpr std::array<int, 5> v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+      spl::filter([](int x) { return x % 2 == 0; }),
+      spl::sum());
+}
+
+TEST(SplTest, FilterConstexpr) {
+  // 2 + 4 = 6
+  static_assert(constexpr_filter_test2() == 6);
+  EXPECT_EQ(constexpr_filter_test2(), 6);
+}
+
+constexpr auto constexpr_take_test2() {
+  constexpr std::array<int, 5> v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+      spl::take(3),
+      spl::sum());
+}
+
+TEST(SplTest, TakeConstexpr) {
+  // 1 + 2 + 3 = 6
+  static_assert(constexpr_take_test2() == 6);
+  EXPECT_EQ(constexpr_take_test2(), 6);
+}
+
+constexpr auto constexpr_flatten_test2() {
+  constexpr std::array<std::array<int, 2>, 3> v{{{1, 2}, {3, 4}, {5, 6}}};
+  return spl::apply(v,
+      spl::flatten(),
+      spl::sum());
+}
+
+TEST(SplTest, FlattenConstexpr) {
+  // 1 + 2 + 3 + 4 + 5 + 6 = 21
+  static_assert(constexpr_flatten_test2() == 21);
+  EXPECT_EQ(constexpr_flatten_test2(), 21);
+}
+
+constexpr auto constexpr_swizzle_test2() {
+  constexpr std::array<int, 3> a{1, 2, 3};
+  constexpr std::array<int, 3> b{10, 20, 30};
+  return spl::apply(a,
+      spl::zip(b),
+      spl::swizzle<1, 0>(),  // Swap order: (a, b) -> (b, a)
+      spl::transform([](int x, int y) { return x - y; }),  // b - a
+      spl::sum());
+}
+
+TEST(SplTest, SwizzleConstexpr) {
+  // (10-1) + (20-2) + (30-3) = 9 + 18 + 27 = 54
+  static_assert(constexpr_swizzle_test2() == 54);
+  EXPECT_EQ(constexpr_swizzle_test2(), 54);
+}
+
+// Constexpr-compatible container for push_back_to/push_back_into tests
+template<typename T, typename MaxSize = std::integral_constant<size_t, 10>>
+struct constexpr_vector {
+  std::array<T, MaxSize::value> data{};
+  std::size_t count = 0;
+
+  constexpr void push_back(const T& value) {
+    data[count++] = value;
+  }
+
+  constexpr void push_back(T&& value) {
+    data[count++] = std::move(value);
+  }
+
+  constexpr std::size_t size() const { return count; }
+  constexpr const T* begin() const { return data.data(); }
+  constexpr const T* end() const { return data.data() + count; }
+  constexpr T* begin() { return data.data(); }
+  constexpr T* end() { return data.data() + count; }
+  constexpr const T& operator[](std::size_t i) const { return data[i]; }
+  constexpr T& operator[](std::size_t i) { return data[i]; }
+};
+
+constexpr auto constexpr_push_back_to_test() {
+  constexpr std::array<int, 5> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v,
+      spl::filter([](int x) { return x % 2 == 1; }),
+      spl::push_back_to<constexpr_vector>());
+  // Odd numbers: 1, 3, 5
+  return result.size() * 100 + result[0] + result[1] + result[2];
+}
+
+TEST(SplTest, PushBackToConstexpr) {
+  // size=3, elements 1+3+5=9, result = 300 + 9 = 309
+  static_assert(constexpr_push_back_to_test() == 309);
+  EXPECT_EQ(constexpr_push_back_to_test(), 309);
+}
+
+constexpr auto constexpr_push_back_into_test() {
+  constexpr std::array<int, 5> v{10, 20, 30, 40, 50};
+  constexpr_vector<int> container;
+  container.push_back(1);  // Pre-existing element
+  spl::apply(v,
+      spl::filter([](int x) { return x >= 30; }),
+      spl::push_back_into(container));
+  // Container now has: 1, 30, 40, 50
+  return container.size() * 1000 + container[0] + container[1] + container[2] + container[3];
+}
+
+TEST(SplTest, PushBackIntoConstexpr) {
+  // size=4, elements 1+30+40+50=121, result = 4000 + 121 = 4121
+  static_assert(constexpr_push_back_into_test() == 4121);
+  EXPECT_EQ(constexpr_push_back_into_test(), 4121);
+}
+
