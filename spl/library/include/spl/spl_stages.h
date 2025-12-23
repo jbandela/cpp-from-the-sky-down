@@ -192,6 +192,9 @@ constexpr auto group_by(SelectorF selector_f, Stages... stages);
 template<typename Comparer, typename... Stages>
 constexpr auto chunk_by(Comparer comparer, Stages... stages);
 
+template<typename... Stages>
+constexpr auto chunk(size_t n, Stages... stages);
+
 // Tee (parallel processing)
 template<typename... Stages>
 constexpr auto tee(Stages&&... stages);
@@ -1176,6 +1179,67 @@ constexpr auto chunk_by(Comparer comparer, Stages... stages) {
                processing_style::incremental,
                Comparer,
                C>(std::move(comparer), compose(std::move(stages)...));
+}
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename Composed>
+struct chunk_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename Composed>
+struct chunk_impl<StageProperties, types<InputTypes...>, Composed>
+    : stage_impl<chunk_impl<StageProperties, types<InputTypes...>, Composed>> {
+  using base = typename chunk_impl::base;
+
+  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
+                                                    processing_style::incremental>(
+      std::declval<Composed>()));
+
+  using output_types = types<decltype(std::declval<pipeline_type>().finish())>;
+
+  size_t chunk_size;
+  Composed composed;
+  size_t current_count = 0;
+  std::optional<pipeline_type> pipeline_;
+
+  constexpr void process_incremental(InputTypes... inputs) {
+    auto copy = [](auto&& t) { return t; };
+
+    if (!pipeline_.has_value()) {
+      // First item - create pipeline
+      pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
+                                           processing_style::incremental>(copy(composed)));
+    }
+
+    pipeline_->process_incremental(std::forward<InputTypes>(inputs)...);
+    ++current_count;
+
+    if (current_count >= chunk_size) {
+      // Chunk complete - finish pipeline and send result to next
+      this->next.process_incremental(pipeline_->finish());
+      // Reset for next chunk
+      current_count = 0;
+      pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
+                                           processing_style::incremental>(copy(composed)));
+    }
+  }
+
+  constexpr decltype(auto) finish() {
+    if (pipeline_.has_value() && current_count > 0) {
+      // Send partial final chunk
+      this->next.process_incremental(pipeline_->finish());
+    }
+    return this->next.finish();
+  }
+};
+
+template<typename... Stages>
+constexpr auto chunk(size_t n, Stages... stages) {
+  using C = decltype(compose(std::move(stages)...));
+  return stage<chunk_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               C>(std::size_t{n}, compose(std::move(stages)...));
 }
 
 // Forward declaration

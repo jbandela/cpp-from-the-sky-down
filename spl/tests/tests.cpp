@@ -5322,3 +5322,137 @@ TEST(SplTest, ChunkByWithStrings) {
   EXPECT_THAT(result, ElementsAre(2, 3, 1));
 }
 
+constexpr auto constexpr_chunk_by_test() {
+  constexpr std::array<int, 9> v{1, 1, 1, 2, 2, 3, 3, 3, 3};
+  return spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::sum()),
+      spl::sum());
+}
+
+TEST(SplTest, ChunkByConstexpr) {
+  // Chunks: [1,1,1]=3, [2,2]=4, [3,3,3,3]=12 -> sum = 19
+  static_assert(constexpr_chunk_by_test() == 19);
+  EXPECT_EQ(constexpr_chunk_by_test(), 19);
+}
+
+// chunk tests
+constexpr auto constexpr_chunk_test() {
+  constexpr std::array<int, 9> v{1, 2, 3, 4, 5, 6, 7, 8, 9};
+  return spl::apply(v,
+      spl::chunk(3, spl::sum()),
+      spl::sum());
+}
+
+TEST(SplTest, ChunkConstexpr) {
+  // Chunks: [1,2,3]=6, [4,5,6]=15, [7,8,9]=24 -> sum = 45
+  static_assert(constexpr_chunk_test() == 45);
+  EXPECT_EQ(constexpr_chunk_test(), 45);
+}
+
+TEST(SplTest, ChunkBasic) {
+  // Chunk into groups of 3
+  std::vector<int> v{1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+  auto result = spl::apply(v,
+      spl::chunk(3, spl::to_vector()),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_THAT(result[0], ElementsAre(1, 2, 3));
+  EXPECT_THAT(result[1], ElementsAre(4, 5, 6));
+  EXPECT_THAT(result[2], ElementsAre(7, 8, 9));
+}
+
+TEST(SplTest, ChunkWithPartialFinal) {
+  // Last chunk is partial
+  std::vector<int> v{1, 2, 3, 4, 5, 6, 7, 8};
+
+  auto result = spl::apply(v,
+      spl::chunk(3, spl::to_vector()),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_THAT(result[0], ElementsAre(1, 2, 3));
+  EXPECT_THAT(result[1], ElementsAre(4, 5, 6));
+  EXPECT_THAT(result[2], ElementsAre(7, 8));
+}
+
+TEST(SplTest, ChunkSum) {
+  // Sum each chunk
+  std::vector<int> v{1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+  auto result = spl::apply(v,
+      spl::chunk(3, spl::sum()),
+      spl::to_vector());
+
+  // Chunks: [1,2,3]=6, [4,5,6]=15, [7,8,9]=24
+  EXPECT_THAT(result, ElementsAre(6, 15, 24));
+}
+
+TEST(SplTest, ChunkCount) {
+  std::vector<int> v{1, 2, 3, 4, 5, 6, 7};
+
+  auto result = spl::apply(v,
+      spl::chunk(3, spl::count()),
+      spl::to_vector());
+
+  // Chunks of size 3, 3, 1
+  EXPECT_THAT(result, ElementsAre(3, 3, 1));
+}
+
+TEST(SplTest, ChunkSingleElement) {
+  std::vector<int> v{42};
+
+  auto result = spl::apply(v,
+      spl::chunk(3, spl::to_vector()),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_THAT(result[0], ElementsAre(42));
+}
+
+TEST(SplTest, ChunkEmpty) {
+  std::vector<int> v{};
+
+  auto result = spl::apply(v,
+      spl::chunk(3, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, ChunkSizeOne) {
+  // Chunk size of 1 - each element is its own chunk
+  std::vector<int> v{1, 2, 3, 4, 5};
+
+  auto result = spl::apply(v,
+      spl::chunk(1, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, ChunkLargerThanInput) {
+  // Chunk size larger than input
+  std::vector<int> v{1, 2, 3};
+
+  auto result = spl::apply(v,
+      spl::chunk(10, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(6));
+}
+
+TEST(SplTest, ChunkWithStrings) {
+  std::vector<std::string> v{"a", "b", "c", "d", "e"};
+
+  auto result = spl::apply(v,
+      spl::chunk(2, spl::to_vector()),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_THAT(result[0], ElementsAre("a", "b"));
+  EXPECT_THAT(result[1], ElementsAre("c", "d"));
+  EXPECT_THAT(result[2], ElementsAre("e"));
+}
+
