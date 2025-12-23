@@ -189,6 +189,9 @@ constexpr auto swizzle();
 template<typename MapType, typename SelectorF, typename... Stages>
 constexpr auto group_by(SelectorF selector_f, Stages... stages);
 
+template<typename Comparer, typename... Stages>
+constexpr auto chunk_by(Comparer comparer, Stages... stages);
+
 // Tee (parallel processing)
 template<typename... Stages>
 constexpr auto tee(Stages&&... stages);
@@ -1080,6 +1083,99 @@ constexpr auto group_by(SelectorF selector_f, Stages... stages) {
                SelectorF,
                C,
                MapType>(std::move(selector_f), compose(std::move(stages)...));
+}
+
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename Comparer, typename Composed>
+struct chunk_by_impl;
+
+// Partial specialization to extract types from types<...>
+template<typename StageProperties, typename... InputTypes, typename Comparer, typename Composed>
+struct chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>
+    : stage_impl<chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>> {
+  using base = typename chunk_by_impl::base;
+  using storage_type = std::tuple<value_storage<InputTypes>...>;
+
+  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
+                                                    processing_style::incremental>(
+      std::declval<Composed>()));
+
+  using output_types = types<decltype(std::declval<pipeline_type>().finish())>;
+
+  Comparer comparer;
+  Composed composed;
+  std::optional<storage_type> stored_;
+  std::optional<pipeline_type> pipeline_;
+
+  template<typename... Stored, typename... Current>
+  constexpr bool compare_items(std::tuple<Stored...>& stored_tuple, Current&&... current) {
+    if constexpr (sizeof...(InputTypes) == 1) {
+      // Single argument - pass directly
+      return std::apply([&](auto&... stored) {
+        return std::invoke(comparer, std::as_const(*stored)..., std::as_const(current)...);
+      }, stored_tuple);
+    } else {
+      // Multiple arguments - wrap in forward_as_tuple
+      return std::apply([&](auto&... stored) {
+        return std::invoke(comparer,
+                           std::forward_as_tuple(std::as_const(*stored)...),
+                           std::forward_as_tuple(std::as_const(current)...));
+      }, stored_tuple);
+    }
+  }
+
+  constexpr void process_incremental(InputTypes... inputs) {
+    auto copy = [](auto&& t) { return t; };
+
+    if (!stored_.has_value()) {
+      // First item - store it and create pipeline
+      stored_.emplace(value_storage<InputTypes>(std::forward<InputTypes>(inputs))...);
+      pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
+                                           processing_style::incremental>(copy(composed)));
+    } else {
+      // Compare current item with stored item
+      bool same_chunk = compare_items(stored_.value(), inputs...);
+
+      if (same_chunk) {
+        // Same chunk - send old item to pipeline, store new item
+        std::apply([&](auto&&... stored) {
+          pipeline_->process_incremental(*std::forward<decltype(stored)>(stored)...);
+        }, std::move(stored_.value()));
+        stored_.emplace(value_storage<InputTypes>(std::forward<InputTypes>(inputs))...);
+      } else {
+        // Different chunk - send old item to pipeline, finish pipeline, send result to next
+        std::apply([&](auto&&... stored) {
+          pipeline_->process_incremental(*std::forward<decltype(stored)>(stored)...);
+        }, std::move(stored_.value()));
+        this->next.process_incremental(pipeline_->finish());
+        // Reset: store new item and create new pipeline
+        stored_.emplace(value_storage<InputTypes>(std::forward<InputTypes>(inputs))...);
+        pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
+                                             processing_style::incremental>(copy(composed)));
+      }
+    }
+  }
+
+  constexpr decltype(auto) finish() {
+    if (stored_.has_value() && pipeline_.has_value()) {
+      // Send final stored item to pipeline and finish
+      std::apply([&](auto&&... stored) {
+        pipeline_->process_incremental(*std::forward<decltype(stored)>(stored)...);
+      }, std::move(stored_.value()));
+      this->next.process_incremental(pipeline_->finish());
+    }
+    return this->next.finish();
+  }
+};
+
+template<typename Comparer, typename... Stages>
+constexpr auto chunk_by(Comparer comparer, Stages... stages) {
+  using C = decltype(compose(std::move(stages)...));
+  return stage<chunk_by_impl,
+               processing_style::incremental,
+               processing_style::incremental,
+               Comparer,
+               C>(std::move(comparer), compose(std::move(stages)...));
 }
 
 // Forward declaration

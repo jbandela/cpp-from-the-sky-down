@@ -5217,3 +5217,108 @@ TEST(SplTest, FilterArgIdentityPointers) {
   EXPECT_EQ(*std::get<1>(result[1]), 3);
 }
 
+// chunk_by tests
+TEST(SplTest, ChunkByBasic) {
+  // Group consecutive equal elements and sum each group
+  std::vector<int> v{1, 1, 1, 2, 2, 3, 3, 3, 3};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::sum()),
+      spl::to_vector());
+
+  // Chunks: [1,1,1]=3, [2,2]=4, [3,3,3,3]=12
+  EXPECT_THAT(result, ElementsAre(3, 4, 12));
+}
+
+TEST(SplTest, ChunkByCount) {
+  // Count elements in each chunk
+  std::vector<int> v{1, 1, 1, 2, 2, 3};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::count()),
+      spl::to_vector());
+
+  // Chunks: [1,1,1]=3, [2,2]=2, [3]=1
+  EXPECT_THAT(result, ElementsAre(3, 2, 1));
+}
+
+TEST(SplTest, ChunkBySingleElement) {
+  std::vector<int> v{42};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(42));
+}
+
+TEST(SplTest, ChunkByEmpty) {
+  std::vector<int> v{};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, ChunkByAllDifferent) {
+  // Each element is its own chunk
+  std::vector<int> v{1, 2, 3, 4, 5};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 4, 5));
+}
+
+TEST(SplTest, ChunkByAllSame) {
+  // All elements in one chunk
+  std::vector<int> v{5, 5, 5, 5, 5};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::sum()),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(25));
+}
+
+TEST(SplTest, ChunkByCustomComparer) {
+  // Group by same sign (positive/negative)
+  std::vector<int> v{1, 2, 3, -1, -2, 4, 5, -3};
+
+  auto same_sign = [](int a, int b) { return (a > 0) == (b > 0); };
+
+  auto result = spl::apply(v,
+      spl::chunk_by(same_sign, spl::sum()),
+      spl::to_vector());
+
+  // Chunks: [1,2,3]=6, [-1,-2]=-3, [4,5]=9, [-3]=-3
+  EXPECT_THAT(result, ElementsAre(6, -3, 9, -3));
+}
+
+TEST(SplTest, ChunkByToVector) {
+  // Collect each chunk into a vector
+  std::vector<int> v{1, 1, 2, 2, 2, 3};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::to_vector()),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_THAT(result[0], ElementsAre(1, 1));
+  EXPECT_THAT(result[1], ElementsAre(2, 2, 2));
+  EXPECT_THAT(result[2], ElementsAre(3));
+}
+
+TEST(SplTest, ChunkByWithStrings) {
+  std::vector<std::string> v{"a", "a", "b", "b", "b", "c"};
+
+  auto result = spl::apply(v,
+      spl::chunk_by(std::equal_to<>{}, spl::count()),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(2, 3, 1));
+}
+
