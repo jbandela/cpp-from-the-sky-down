@@ -54,6 +54,9 @@ constexpr auto transform_arg_cps(F f);
 template<size_t I, typename F>
 constexpr auto transform_arg(F f);
 
+// Enumerate (prepend index to each element)
+inline constexpr auto enumerate(size_t start = 0);
+
 // Sorting stages
 template<typename Comparator>
 constexpr auto sort(Comparator comp);
@@ -732,6 +735,12 @@ constexpr auto transform_arg(F f) {
                    std::forward<decltype(after_args)>(after_args)...);
       }, std::forward<decltype(after)>(after));
     }, std::forward<decltype(before)>(before));
+  });
+}
+
+inline constexpr auto enumerate(size_t start) {
+  return transform_cps([i = start](auto&& out, auto&&... inputs) mutable {
+    return out(i++, std::forward<decltype(inputs)>(inputs)...);
   });
 }
 

@@ -5611,3 +5611,39 @@ TEST(SplTest, PushBackIntoConstexpr) {
   EXPECT_EQ(constexpr_push_back_into_test(), 4121);
 }
 
+TEST(SplTest, Enumerate) {
+  std::vector<int> v{10, 20, 30};
+  std::vector<std::pair<size_t, int>> result;
+  spl::apply(v,
+      spl::enumerate(),
+      spl::for_each([&](size_t idx, int val) {
+        result.emplace_back(idx, val);
+      }));
+  EXPECT_THAT(result, ElementsAre(Pair(0, 10), Pair(1, 20), Pair(2, 30)));
+}
+
+TEST(SplTest, EnumerateWithStart) {
+  std::vector<int> v{10, 20, 30};
+  std::vector<std::pair<size_t, int>> result;
+  spl::apply(v,
+      spl::enumerate(5),
+      spl::for_each([&](size_t idx, int val) {
+        result.emplace_back(idx, val);
+      }));
+  EXPECT_THAT(result, ElementsAre(Pair(5, 10), Pair(6, 20), Pair(7, 30)));
+}
+
+constexpr auto constexpr_enumerate_test() {
+  constexpr std::array<int, 3> v{10, 20, 30};
+  return spl::apply(v,
+      spl::enumerate(),
+      spl::transform([](size_t idx, int val) { return idx * 100 + val; }),
+      spl::sum());
+  // (0*100+10) + (1*100+20) + (2*100+30) = 10 + 120 + 230 = 360
+}
+
+TEST(SplTest, EnumerateConstexpr) {
+  static_assert(constexpr_enumerate_test() == 360);
+  EXPECT_EQ(constexpr_enumerate_test(), 360);
+}
+
