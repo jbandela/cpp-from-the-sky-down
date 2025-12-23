@@ -4913,3 +4913,307 @@ TEST(SplTest, RepeatWhileBasedOnValue) {
   EXPECT_THAT(result, ElementsAre(1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
 }
 
+// ============================================================================
+// flatten_optional Tests
+// ============================================================================
+
+TEST(SplTest, FlattenOptionalBasic) {
+  std::array<std::optional<int>, 4> v{1, std::nullopt, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 3, 4));
+}
+
+TEST(SplTest, FlattenOptionalAllPresent) {
+  std::array<std::optional<int>, 3> v{1, 2, 3};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, FlattenOptionalAllEmpty) {
+  std::array<std::optional<int>, 3> v{std::nullopt, std::nullopt, std::nullopt};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, FlattenOptionalEmpty) {
+  std::array<std::optional<int>, 0> v{};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, FlattenOptionalWithSum) {
+  std::array<std::optional<int>, 5> v{1, std::nullopt, 3, std::nullopt, 5};
+
+  int result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::sum());
+
+  EXPECT_EQ(result, 9);  // 1 + 3 + 5
+}
+
+TEST(SplTest, FlattenOptionalConstexpr) {
+  constexpr int result = []() {
+    std::array<std::optional<int>, 4> v{1, std::nullopt, 3, 4};
+    return spl::apply(v,
+        spl::flatten_optional(),
+        spl::sum());
+  }();
+  static_assert(result == 8);  // 1 + 3 + 4
+  EXPECT_EQ(result, 8);
+}
+
+TEST(SplTest, FlattenOptionalArgMiddle) {
+  // 3-arg stream, flatten middle arg (index 1) which is optional
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<std::optional<int>, 3> v2{10, std::nullopt, 30};
+  std::array<int, 3> v3{100, 200, 300};
+
+  std::vector<std::tuple<int, int, int>> result = spl::apply(v1,
+      spl::zip(v2, v3),
+      spl::flatten_optional_arg<1>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10, 100));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30, 300));
+}
+
+TEST(SplTest, FlattenOptionalArgFirst) {
+  std::array<std::optional<int>, 3> v1{1, std::nullopt, 3};
+  std::array<int, 3> v2{10, 20, 30};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::flatten_optional_arg<0>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, FlattenOptionalArgLast) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<std::optional<int>, 3> v2{10, std::nullopt, 30};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::flatten_optional_arg<1>(),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, FlattenOptionalPointer) {
+  int a = 1, b = 2, c = 3;
+  std::array<int*, 4> v{&a, nullptr, &b, &c};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3));
+}
+
+TEST(SplTest, FlattenOptionalWithTransform) {
+  std::array<std::optional<int>, 4> v{1, std::nullopt, 3, 4};
+
+  std::vector<int> result = spl::apply(v,
+      spl::flatten_optional(),
+      spl::transform([](int x) { return x * 10; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(10, 30, 40));
+}
+
+// ============================================================================
+// filter_arg Tests
+// ============================================================================
+
+TEST(SplTest, FilterArgBasicMiddle) {
+  // 3-arg stream, filter based on middle arg (index 1)
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{10, 25, 30, 45};  // filter where v2 > 20
+  std::array<int, 4> v3{100, 200, 300, 400};
+
+  std::vector<std::tuple<int, int, int>> result = spl::apply(v1,
+      spl::zip(v2, v3),
+      spl::filter_arg<1>([](int x) { return x > 20; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+  EXPECT_EQ(result[0], std::make_tuple(2, 25, 200));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30, 300));
+  EXPECT_EQ(result[2], std::make_tuple(4, 45, 400));
+}
+
+TEST(SplTest, FilterArgFirst) {
+  // 2-arg stream, filter based on first arg (index 0)
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{10, 20, 30, 40};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<0>([](int x) { return x % 2 == 0; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(2, 20));
+  EXPECT_EQ(result[1], std::make_tuple(4, 40));
+}
+
+TEST(SplTest, FilterArgLast) {
+  // 2-arg stream, filter based on last arg (index 1)
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{10, 25, 30, 45};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<1>([](int x) { return x % 10 == 0; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, FilterArgSingle) {
+  // Single arg stream (equivalent to filter)
+  std::array<int, 5> v{1, 2, 3, 4, 5};
+
+  std::vector<int> result = spl::apply(v,
+      spl::filter_arg<0>([](int x) { return x > 2; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(3, 4, 5));
+}
+
+TEST(SplTest, FilterArgAllPass) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{10, 20, 30};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<1>([](int x) { return x > 0; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 3);
+}
+
+TEST(SplTest, FilterArgNonePass) {
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{10, 20, 30};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<1>([](int x) { return x > 100; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, FilterArgConstexpr) {
+  constexpr int result = []() {
+    std::array<int, 4> v1{1, 2, 3, 4};
+    std::array<int, 4> v2{10, 20, 30, 40};
+    return spl::apply(v1,
+        spl::zip(v2),
+        spl::filter_arg<0>([](int x) { return x % 2 == 0; }),
+        spl::transform([](int a, int b) { return a + b; }),
+        spl::sum());
+  }();
+  static_assert(result == 66);  // (2+20) + (4+40) = 22 + 44 = 66
+  EXPECT_EQ(result, 66);
+}
+
+TEST(SplTest, FilterArgWithTransform) {
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{10, 20, 30, 40};
+
+  std::vector<int> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<0>([](int x) { return x > 2; }),
+      spl::transform([](int a, int b) { return a * b; }),
+      spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(90, 160));  // 3*30, 4*40
+}
+
+TEST(SplTest, FilterArgChained) {
+  // Filter on multiple args in sequence
+  std::array<int, 4> v1{1, 2, 3, 4};
+  std::array<int, 4> v2{10, 20, 30, 40};
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<0>([](int x) { return x > 1; }),
+      spl::filter_arg<1>([](int x) { return x < 40; }),
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(2, 20));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, FilterArgIdentity) {
+  // filter_arg<I>() with no predicate uses std::identity (filters falsy values)
+  std::array<int, 3> v1{1, 2, 3};
+  std::array<int, 3> v2{10, 0, 30};  // 0 is falsy
+
+  std::vector<std::tuple<int, int>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<1>(),  // filter based on truthiness of arg 1
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], std::make_tuple(1, 10));
+  EXPECT_EQ(result[1], std::make_tuple(3, 30));
+}
+
+TEST(SplTest, FilterArgIdentityPointers) {
+  // filter_arg<I>() filters null pointers
+  int a = 1, b = 2, c = 3;
+  std::array<int, 3> v1{10, 20, 30};
+  std::array<int*, 3> v2{&a, nullptr, &c};
+
+  std::vector<std::tuple<int, int*>> result = spl::apply(v1,
+      spl::zip(v2),
+      spl::filter_arg<1>(),  // filter based on truthiness of pointer
+      spl::make_tuple(),
+      spl::to_vector());
+
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(std::get<0>(result[0]), 10);
+  EXPECT_EQ(*std::get<1>(result[0]), 1);
+  EXPECT_EQ(std::get<0>(result[1]), 30);
+  EXPECT_EQ(*std::get<1>(result[1]), 3);
+}
+

@@ -84,6 +84,12 @@ constexpr auto unique();
 template<typename Predicate>
 constexpr auto filter(Predicate predicate);
 
+template<size_t I, typename Predicate>
+constexpr auto filter_arg(Predicate predicate);
+
+template<size_t I>
+constexpr auto filter_arg();
+
 constexpr auto take(size_t n);
 
 template<typename Predicate>
@@ -112,6 +118,11 @@ constexpr auto flatten();
 
 template<size_t I>
 constexpr auto flatten_arg();
+
+inline constexpr auto flatten_optional();
+
+template<size_t I>
+constexpr auto flatten_optional_arg();
 
 // Tuple/pair manipulation
 inline constexpr auto expand_tuple();
@@ -438,6 +449,37 @@ constexpr auto filter(Predicate predicate) {
 
 constexpr inline auto filter(){
   return filter(std::identity{});
+}
+
+template<size_t I, typename Predicate>
+constexpr auto filter_arg(Predicate predicate) {
+  return flat_map_arg<I>([predicate = std::move(predicate)](auto&& out, auto&& before, auto&& arg, auto&& after) {
+    if constexpr (calculate_type_v<decltype(out)>) {
+      return std::apply([&](auto&&... before_args) {
+        return std::apply([&](auto&&... after_args) {
+          return out(std::forward<decltype(before_args)>(before_args)...,
+                     std::forward<decltype(arg)>(arg),
+                     std::forward<decltype(after_args)>(after_args)...);
+        }, std::forward<decltype(after)>(after));
+      }, std::forward<decltype(before)>(before));
+    } else {
+      if (std::invoke(predicate, std::as_const(arg))) {
+        std::apply([&](auto&&... before_args) {
+          std::apply([&](auto&&... after_args) {
+            out(std::forward<decltype(before_args)>(before_args)...,
+                std::forward<decltype(arg)>(arg),
+                std::forward<decltype(after_args)>(after_args)...);
+          }, std::forward<decltype(after)>(after));
+        }, std::forward<decltype(before)>(before));
+      }
+      return true;
+    }
+  });
+}
+
+template<size_t I>
+constexpr auto filter_arg() {
+  return filter_arg<I>(std::identity{});
 }
 
 constexpr auto take(size_t
@@ -923,6 +965,36 @@ constexpr auto flatten_arg() {
       }, std::forward<decltype(after)>(after));
     }, std::forward<decltype(before)>(before));
   });
+}
+
+template<size_t I>
+constexpr auto flatten_optional_arg() {
+  return flat_map_arg<I>([](auto&& out, auto&& before, auto&& arg, auto&& after) {
+    if constexpr (calculate_type_v<decltype(out)>) {
+      return std::apply([&](auto&&... before_args) {
+        return std::apply([&](auto&&... after_args) {
+          return out(std::forward<decltype(before_args)>(before_args)...,
+                     *std::forward<decltype(arg)>(arg),
+                     std::forward<decltype(after_args)>(after_args)...);
+        }, std::forward<decltype(after)>(after));
+      }, std::forward<decltype(before)>(before));
+    } else {
+      if (arg) {
+        std::apply([&](auto&&... before_args) {
+          std::apply([&](auto&&... after_args) {
+            out(std::forward<decltype(before_args)>(before_args)...,
+                *std::forward<decltype(arg)>(arg),
+                std::forward<decltype(after_args)>(after_args)...);
+          }, std::forward<decltype(after)>(after));
+        }, std::forward<decltype(before)>(before));
+      }
+      return true;
+    }
+  });
+}
+
+inline constexpr auto flatten_optional() {
+  return flatten_optional_arg<0>();
 }
 
 template<template<typename...> typename C>
