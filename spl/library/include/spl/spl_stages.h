@@ -969,28 +969,7 @@ constexpr auto flatten_arg() {
 
 template<size_t I>
 constexpr auto flatten_optional_arg() {
-  return flat_map_arg<I>([](auto&& out, auto&& before, auto&& arg, auto&& after) {
-    if constexpr (calculate_type_v<decltype(out)>) {
-      return std::apply([&](auto&&... before_args) {
-        return std::apply([&](auto&&... after_args) {
-          return out(std::forward<decltype(before_args)>(before_args)...,
-                     *std::forward<decltype(arg)>(arg),
-                     std::forward<decltype(after_args)>(after_args)...);
-        }, std::forward<decltype(after)>(after));
-      }, std::forward<decltype(before)>(before));
-    } else {
-      if (arg) {
-        std::apply([&](auto&&... before_args) {
-          std::apply([&](auto&&... after_args) {
-            out(std::forward<decltype(before_args)>(before_args)...,
-                *std::forward<decltype(arg)>(arg),
-                std::forward<decltype(after_args)>(after_args)...);
-          }, std::forward<decltype(after)>(after));
-        }, std::forward<decltype(before)>(before));
-      }
-      return true;
-    }
-  });
+  return compose(filter_arg<I>(), deref_arg<I>());
 }
 
 inline constexpr auto flatten_optional() {
