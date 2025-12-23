@@ -373,6 +373,8 @@ inline constexpr auto values() {
 
 } // namespace detail
 
+namespace detail {
+
 template<typename F>
 struct composed {
   [[no_unique_address]] F f;
@@ -387,9 +389,11 @@ struct composed {
 template<typename F>
 composed(F) -> composed<F>;
 
+} // namespace detail
+
 template<typename... Ts>
 constexpr auto compose(Ts &&... ts) {
-  return composed{[...args = std::forward<Ts>(ts)](auto&& prev, auto&&... next)constexpr mutable{
+  return detail::composed{[...args = std::forward<Ts>(ts)](auto&& prev, auto&&... next)constexpr mutable{
     if constexpr (sizeof...(next) == 1) {
       return (std::forward<decltype(prev)>(prev) + ... + std::move(
           args)).make(
