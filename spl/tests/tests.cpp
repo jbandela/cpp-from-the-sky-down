@@ -875,7 +875,7 @@ constexpr auto constexpr_accumulate_in_place_with_init_test() {
   constexpr std::array v{1, 2, 3, 4, 5};
   return spl::apply(v,
                     spl::accumulate_in_place_with_init(
-                        []<typename... Types>(spl::types<Types...>) {
+                        []<typename... Types>(spl::impl::types<Types...>) {
                           return int{};
                         },
                         [](int &acc, int x) { acc += x * x; }));
@@ -891,7 +891,7 @@ constexpr auto constexpr_accumulate_in_place_with_init_product_test() {
   constexpr std::array v{2, 3, 4};
   return spl::apply(v,
                     spl::accumulate_in_place_with_init(
-                        []<typename... Types>(spl::types<Types...>) {
+                        []<typename... Types>(spl::impl::types<Types...>) {
                           return int{1};
                         },
                         [](int &acc, int x) {
@@ -922,7 +922,7 @@ constexpr auto constexpr_accumulate_in_place_with_init_pair_test() {
   auto result = spl::apply(v,
                            spl::expand_tuple(),
                            spl::accumulate_in_place_with_init(
-                               []<typename... Types>(spl::types<Types...>) {
+                               []<typename... Types>(spl::impl::types<Types...>) {
                                  return Acc{};
                                },
                                [](Acc &acc, int a, int b) {
@@ -942,7 +942,7 @@ TEST(SplTest, AccumulateInPlaceWithInitVector) {
   std::vector<int> v{5, 10, 15, 20};
   auto result = spl::apply(v,
                            spl::accumulate_in_place_with_init(
-                               []<typename... Types>(spl::types<Types...>) {
+                               []<typename... Types>(spl::impl::types<Types...>) {
                                  return int{};
                                },
                                [](int &acc, int x) { acc += x; }));
@@ -955,7 +955,7 @@ constexpr auto constexpr_accumulate_in_place_with_init_with_filter_test() {
   return spl::apply(v,
                     spl::filter([](int x) { return x % 2 == 0; }),
                     spl::accumulate_in_place_with_init(
-                        []<typename... Types>(spl::types<Types...>) {
+                        []<typename... Types>(spl::impl::types<Types...>) {
                           return int{};
                         },
                         [](int &acc, int x) { acc += x; }));
@@ -1132,7 +1132,7 @@ TEST(SplTest, ToMapStringKeys) {
 TEST(SplTest, GeneratorBasic) {
   // Create a simple generator that yields values
   auto gen = spl::generator([i = 0](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i >= 5) return false;
@@ -1148,7 +1148,7 @@ TEST(SplTest, GeneratorBasic) {
 
 TEST(SplTest, GeneratorWithTransform) {
   auto gen = spl::generator([i = 1](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i > 4) return false;
@@ -1166,7 +1166,7 @@ TEST(SplTest, GeneratorWithTransform) {
 
 TEST(SplTest, GeneratorWithFilter) {
   auto gen = spl::generator([i = 0](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i >= 10) return false;
@@ -1184,7 +1184,7 @@ TEST(SplTest, GeneratorWithFilter) {
 
 TEST(SplTest, GeneratorWithTake) {
   auto gen = spl::generator([i = 0](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       out(i++);
@@ -1201,7 +1201,7 @@ TEST(SplTest, GeneratorWithTake) {
 
 TEST(SplTest, GeneratorWithSum) {
   auto gen = spl::generator([i = 1](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i > 5) return false;
@@ -1218,7 +1218,7 @@ TEST(SplTest, GeneratorWithSum) {
 TEST(SplTest, GeneratorFibonacci) {
   // Fibonacci generator
   auto gen = spl::generator([a = 0, b = 1, count = 0](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(a));
     } else {
       if (count >= 10) return false;
@@ -1239,7 +1239,7 @@ TEST(SplTest, GeneratorFibonacci) {
 
 TEST(SplTest, GeneratorWithGroupBy) {
   auto gen = spl::generator([i = 0](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i >= 10) return false;
@@ -1269,7 +1269,7 @@ TEST(SplTest, GeneratorWithGroupBy) {
 
 constexpr auto constexpr_generator_test() {
   auto gen = spl::generator([i = 1](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i > 5) return false;
@@ -1289,7 +1289,7 @@ TEST(SplTest, GeneratorConstexpr) {
 TEST(SplTest, GeneratorMultipleIterations) {
   // Test that generator can be used to produce pairs
   auto gen = spl::generator([i = 0](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(std::pair<int, int>(i, i * 10));
     } else {
       if (i >= 5) return false;
@@ -2605,7 +2605,7 @@ TEST(SplTest, FirstLastWithTee) {
 // Test first/last with generator
 TEST(SplTest, FirstWithGenerator) {
   auto gen = spl::generator([i = 10](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i >= 15) return false;
@@ -2620,7 +2620,7 @@ TEST(SplTest, FirstWithGenerator) {
 
 TEST(SplTest, LastWithGenerator) {
   auto gen = spl::generator([i = 10](auto &&out) mutable {
-    if constexpr (spl::calculate_type_v<decltype(out)>) {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
       return out(int(i));
     } else {
       if (i >= 15) return false;
@@ -4821,7 +4821,7 @@ TEST(SplTest, RepeatWhileWithCapturedState) {
 
   std::vector<int> result = spl::apply(v,
       spl::flat_map([](auto&& out, int x) {
-        if constexpr (spl::calculate_type_v<decltype(out)>) {
+        if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
           return out(x);
         } else {
           for (int i = 0; i < x && out; ++i) {

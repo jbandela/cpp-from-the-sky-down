@@ -270,22 +270,22 @@ struct value_storage<T&&> {
 template<typename StageProperties, typename InputTypes, typename Init, typename F>
 struct accumulate_in_place_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename Init, typename F>
-struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, Init, F>
-    : stage_impl<accumulate_in_place_impl<StageProperties,
-                                          types<InputTypes...>,
+struct accumulate_in_place_impl<StageProperties, impl::types<InputTypes...>, Init, F>
+    : impl::stage_impl<accumulate_in_place_impl<StageProperties,
+                                          impl::types<InputTypes...>,
                                           Init,
                                           F>> {
   using base = typename accumulate_in_place_impl::base;
   using accumulated_type = std::invoke_result_t<
       Init,
-      types<InputTypes...>>;
+      impl::types<InputTypes...>>;
   static_assert(!std::is_same_v<accumulated_type, void>);
-  using output_types = types<accumulated_type &&>;
+  using output_types = impl::types<accumulated_type &&>;
   [[no_unique_address]] Init init;
   [[no_unique_address]] F f{};
-  [[no_unique_address]] accumulated_type accumulated = std::invoke(init,types<InputTypes...>());
+  [[no_unique_address]] accumulated_type accumulated = std::invoke(init,impl::types<InputTypes...>());
 
   constexpr decltype(auto) process_incremental(InputTypes... inputs) {
     std::invoke(f, accumulated, std::forward<InputTypes>(inputs)...);
@@ -300,9 +300,9 @@ struct accumulate_in_place_impl<StageProperties, types<InputTypes...>, Init, F>
 
 template<typename Init, typename F>
 constexpr auto accumulate_in_place_with_init(Init init, F f) {
-  return stage<accumulate_in_place_impl,
-              processing_style::incremental,
-              processing_style::complete,
+  return impl::stage<accumulate_in_place_impl,
+              impl::processing_style::incremental,
+              impl::processing_style::complete,
               decltype(init),
               F>(
      std::move(init), std::move(f));
@@ -329,7 +329,7 @@ constexpr auto accumulate(T t, F f) {
 
 template<typename F>
 constexpr auto accumulate(F f) {
-  return accumulate_in_place_with_init([]<typename T, typename... Types>(types<T,Types...>) {
+  return accumulate_in_place_with_init([]<typename T, typename... Types>(impl::types<T,Types...>) {
                                static_assert(sizeof...(Types) == 0,
                                              "Accumulate without an explicit init needs to only have one input");
                                return std::remove_cvref_t<T>();
@@ -364,25 +364,25 @@ constexpr auto count() {
 template<typename StageProperties, typename InputTypes, typename F>
 struct flat_map_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename F>
 struct flat_map_impl<StageProperties,
-                     types<InputTypes...>,
+                     impl::types<InputTypes...>,
                      F>
-    : stage_impl<flat_map_impl<StageProperties,
-                               types<InputTypes...>,
+    : impl::stage_impl<flat_map_impl<StageProperties,
+                               impl::types<InputTypes...>,
                                F>> {
   using base = typename flat_map_impl::base;
   using output_types = decltype(std::invoke(std::declval<F>(),
-                                            type_calculating_outputter(),
+                                            impl::type_calculating_outputter(),
                                             std::declval<InputTypes>()...));
-  static_assert(is_types<output_types>::value);
+  static_assert(detail::is_types<output_types>::value);
   [[no_unique_address]] F f{};
   bool done_ = false;
 
   constexpr decltype(auto) process_incremental(InputTypes... inputs) {
     done_ = !std::invoke(f,
-                         incremental_outputter{this->next},
+                         impl::incremental_outputter{this->next},
                          static_cast<InputTypes>(inputs)...);
   }
 
@@ -394,14 +394,14 @@ struct flat_map_impl<StageProperties,
 
 struct IdentityOutputCalculator {
   template<typename... Ts>
-  using output_types = types<Ts...>;
+  using output_types = impl::types<Ts...>;
 };
 
 template<typename F>
 constexpr auto flat_map(F f) {
-  return stage<flat_map_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<flat_map_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                F>(std::move(f));
 
 }
@@ -419,7 +419,7 @@ constexpr auto flat_map_arg(F f) {
                          std::forward_as_tuple(std::get<I + 1 + After>(std::move(tuple))...));
     };
 
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
     } else {
       invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Inputs) - I - 1>{});
@@ -433,7 +433,7 @@ constexpr auto filter(Predicate predicate) {
   return flat_map([predicate =
   std::move(predicate)]<typename Output, typename... Inputs>(Output &&output,
                                                              Inputs &&... inputs) {
-    if constexpr (calculate_type_v<Output>) {
+    if constexpr (impl::calculate_type_v<Output>) {
 
       return output(std::forward<Inputs>(inputs)...);
 
@@ -453,7 +453,7 @@ constexpr inline auto filter(){
 template<size_t I, typename Predicate>
 constexpr auto filter_arg(Predicate predicate) {
   return flat_map_arg<I>([predicate = std::move(predicate)](auto&& out, auto&& before, auto&& arg, auto&& after) {
-    if constexpr (calculate_type_v<decltype(out)>) {
+    if constexpr (impl::calculate_type_v<decltype(out)>) {
       return std::apply([&](auto&&... before_args) {
         return std::apply([&](auto&&... after_args) {
           return out(std::forward<decltype(before_args)>(before_args)...,
@@ -490,7 +490,7 @@ constexpr auto take(size_t
       auto &&...inputs
   )mutable {
 
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return output(std::forward<decltype(inputs)>(inputs)...
       );
 
@@ -514,7 +514,7 @@ constexpr auto take_while(Predicate predicate) {
       Out&& output,
       auto&&... inputs
   ) mutable {
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return output(std::forward<decltype(inputs)>(inputs)...);
     } else {
       if (done) return false;
@@ -531,7 +531,7 @@ constexpr auto skip(size_t n) {
       Out&& output,
       auto&&... inputs
   ) mutable {
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return output(std::forward<decltype(inputs)>(inputs)...);
     } else {
       if (i < n) {
@@ -551,7 +551,7 @@ constexpr auto skip_while(Predicate predicate) {
       Out&& output,
       auto&&... inputs
   ) mutable {
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return output(std::forward<decltype(inputs)>(inputs)...);
     } else {
       if (skipping && std::invoke(predicate, std::as_const(inputs)...)) {
@@ -569,7 +569,7 @@ constexpr auto repeat(size_t n) {
       Out&& output,
       auto&&... inputs
   ) {
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return output(forward_as_const<decltype(inputs)>(inputs)...);
     } else {
       for (size_t i = 0; i < n && output; ++i) {
@@ -586,7 +586,7 @@ constexpr auto repeat_while(Predicate predicate) {
       Out&& output,
       auto&&... inputs
   ) {
-    if constexpr (calculate_type_v<Out>) {
+    if constexpr (impl::calculate_type_v<Out>) {
       return output(forward_as_const<decltype(inputs)>(inputs)...);
     } else {
       while (output && std::invoke(predicate, std::as_const(inputs)...)) {
@@ -601,12 +601,12 @@ constexpr auto repeat_while(Predicate predicate) {
 template<typename StageProperties, typename InputTypes>
 struct filter_duplicates_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes>
-struct filter_duplicates_impl<StageProperties, types<InputTypes...>>
-    : stage_impl<filter_duplicates_impl<StageProperties, types<InputTypes...>>> {
+struct filter_duplicates_impl<StageProperties, impl::types<InputTypes...>>
+    : impl::stage_impl<filter_duplicates_impl<StageProperties, impl::types<InputTypes...>>> {
   using base = typename filter_duplicates_impl::base;
-  using output_types = types<InputTypes...>;
+  using output_types = impl::types<InputTypes...>;
   using storage_type = std::tuple<value_storage<InputTypes>...>;
 
   std::optional<storage_type> stored_;
@@ -638,32 +638,32 @@ struct filter_duplicates_impl<StageProperties, types<InputTypes...>>
 };
 
 constexpr auto filter_duplicates() {
-  return stage<filter_duplicates_impl,
-               processing_style::incremental,
-               processing_style::incremental>();
+  return impl::stage<filter_duplicates_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental>();
 }
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename F>
 struct transform_cps_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename F>
-struct transform_cps_impl<StageProperties, types<InputTypes...>, F>
-    : stage_impl<transform_cps_impl<StageProperties, types<InputTypes...>, F>> {
+struct transform_cps_impl<StageProperties, impl::types<InputTypes...>, F>
+    : impl::stage_impl<transform_cps_impl<StageProperties, impl::types<InputTypes...>, F>> {
   using base = typename transform_cps_impl::base;
 
   using output_types = decltype(std::invoke(
       std::declval<F>(),
-      type_calculating_outputter(),
+      impl::type_calculating_outputter(),
       std::declval<InputTypes>()...));
 
-  static_assert(is_types<output_types>::value);
+  static_assert(detail::is_types<output_types>::value);
 
   [[no_unique_address]] F f{};
 
   constexpr void process_incremental(InputTypes... inputs)
-      requires(incremental_input<transform_cps_impl>) {
+      requires(impl::incremental_input<transform_cps_impl>) {
     std::invoke(f,
                 [this](auto&&... outputs) {
                   this->next.process_incremental(std::forward<decltype(outputs)>(outputs)...);
@@ -672,7 +672,7 @@ struct transform_cps_impl<StageProperties, types<InputTypes...>, F>
   }
 
   constexpr decltype(auto) process_complete(InputTypes... inputs)
-      requires(complete_input<transform_cps_impl>) {
+      requires(impl::complete_input<transform_cps_impl>) {
     return std::invoke(f,
                        [this](auto&&... outputs) -> decltype(auto) {
                          return this->next.process_complete(std::forward<decltype(outputs)>(outputs)...);
@@ -683,9 +683,9 @@ struct transform_cps_impl<StageProperties, types<InputTypes...>, F>
 
 template<typename F>
 constexpr auto transform_cps(F f) {
-  return stage<transform_cps_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<transform_cps_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                F>(std::move(f));
 }
 
@@ -706,7 +706,7 @@ constexpr auto transform_arg_cps(F f) {
                          std::forward<decltype(arg)>(arg),
                          std::forward<decltype(after)>(after));
     };
-    if constexpr (calculate_type_v<decltype(out)>) {
+    if constexpr (impl::calculate_type_v<decltype(out)>) {
       return invoke();
     } else {
       invoke();
@@ -799,9 +799,9 @@ constexpr auto construct() {
 
 template<typename F>
 constexpr auto transform_complete_cps(F f) {
-  return stage<transform_cps_impl,
-               processing_style::complete,
-               processing_style::complete,
+  return impl::stage<transform_cps_impl,
+               impl::processing_style::complete,
+               impl::processing_style::complete,
                F>(std::move(f));
 }
 
@@ -939,9 +939,9 @@ constexpr auto swizzle() {
 
 constexpr auto flatten() {
   return flat_map([]<typename Out>(Out &&out, auto &&...inputs) {
-    return invoke_with_last_first(
+    return detail::invoke_with_last_first(
         [&](auto &&last, auto &&... inputs) {
-          return SkydownSplOutput(as_outputter(out,
+          return SkydownSplOutput(impl::as_outputter(out,
                                                [&](auto &&out, auto &&item) {
                                                  return out(std::forward<
                                                                 decltype(inputs)>(inputs)...,
@@ -960,7 +960,7 @@ constexpr auto flatten_arg() {
   return flat_map_arg<I>([](auto&& out, auto&& before, auto&& arg, auto&& after) {
     return std::apply([&](auto&&... before_args) {
       return std::apply([&](auto&&... after_args) {
-        return SkydownSplOutput(as_outputter(out,
+        return SkydownSplOutput(impl::as_outputter(out,
             [&](auto&& out, auto&& item) {
               return out(forward_as_const<decltype(before_args)>(before_args)...,
                          std::forward<decltype(item)>(item),
@@ -983,10 +983,10 @@ inline constexpr auto flatten_optional() {
 
 template<template<typename...> typename C>
 constexpr auto push_back_to() {
-  return accumulate_in_place_with_init([]<typename... Inputs>(types<Inputs...>) {
+  return accumulate_in_place_with_init([]<typename... Inputs>(impl::types<Inputs...>) {
     static_assert(sizeof...(Inputs) == 1,
                   "push_back_to can only take 1 input argument");
-    return C<std::remove_cvref_t<first_type_t<types<Inputs...>>>>{};
+    return C<std::remove_cvref_t<detail::first_type_t<impl::types<Inputs...>>>>{};
   }, [](auto &c, auto &&v) {
     c.push_back(std::forward<decltype(v)>(v));
   });
@@ -998,7 +998,7 @@ constexpr auto to_vector() {
 
 template<template<typename, typename> typename MapType>
 constexpr auto to_map() {
-  return accumulate_in_place_with_init([]<typename... Inputs>(types<Inputs...>) {
+  return accumulate_in_place_with_init([]<typename... Inputs>(impl::types<Inputs...>) {
     static_assert(sizeof...(Inputs) == 2, "to_map needs 2 input arguments");
     return MapType<std::remove_cvref_t<Inputs>...>{};
   }, [](auto &m, auto &&... args) {
@@ -1018,15 +1018,15 @@ struct std_map {
 template<typename StageProperties, typename InputTypes, typename SelectorF, typename Composed, typename MapType = detail::std_map>
 struct group_by_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename SelectorF, typename Composed, typename MapType>
 struct group_by_impl<StageProperties,
-                     types<InputTypes...>,
+                     impl::types<InputTypes...>,
                      SelectorF,
                      Composed,
                      MapType>
-    : stage_impl<group_by_impl<StageProperties,
-                               types<InputTypes...>,
+    : impl::stage_impl<group_by_impl<StageProperties,
+                               impl::types<InputTypes...>,
                                SelectorF,
                                Composed,
                                MapType>> {
@@ -1038,11 +1038,11 @@ struct group_by_impl<StageProperties,
   SelectorF selector_f;
   Composed composed;
 
-  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
-                                                    processing_style::incremental>(
+  using pipeline_type = decltype(impl::make_pipeline<impl::types<InputTypes...>,
+                                                    impl::processing_style::incremental>(
       std::declval<Composed>()));
 
-  using output_types = types<key,
+  using output_types = impl::types<key,
                                        decltype(std::declval<
                                            pipeline_type>().finish()) >;
 
@@ -1055,8 +1055,8 @@ struct group_by_impl<StageProperties,
     if (iter == map.end()) {
       bool b;
       std::tie(iter, b) = map.emplace(std::move(k),
-                                      spl::make_pipeline<types<InputTypes...>,
-                                                         processing_style::incremental>(
+                                      impl::make_pipeline<impl::types<InputTypes...>,
+                                                         impl::processing_style::incremental>(
                                           copy(composed)));
     }
 
@@ -1077,9 +1077,9 @@ struct group_by_impl<StageProperties,
 template<typename MapType = detail::std_map, typename SelectorF, typename... Stages>
 constexpr auto group_by(SelectorF selector_f, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return stage<group_by_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<group_by_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                SelectorF,
                C,
                MapType>(std::move(selector_f), compose(std::move(stages)...));
@@ -1089,18 +1089,18 @@ constexpr auto group_by(SelectorF selector_f, Stages... stages) {
 template<typename StageProperties, typename InputTypes, typename Comparer, typename Composed>
 struct chunk_by_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename Comparer, typename Composed>
-struct chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>
-    : stage_impl<chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>> {
+struct chunk_by_impl<StageProperties, impl::types<InputTypes...>, Comparer, Composed>
+    : impl::stage_impl<chunk_by_impl<StageProperties, impl::types<InputTypes...>, Comparer, Composed>> {
   using base = typename chunk_by_impl::base;
   using storage_type = std::tuple<value_storage<InputTypes>...>;
 
-  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
-                                                    processing_style::incremental>(
+  using pipeline_type = decltype(impl::make_pipeline<impl::types<InputTypes...>,
+                                                    impl::processing_style::incremental>(
       std::declval<Composed>()));
 
-  using output_types = types<decltype(std::declval<pipeline_type>().finish())>;
+  using output_types = impl::types<decltype(std::declval<pipeline_type>().finish())>;
 
   Comparer comparer;
   Composed composed;
@@ -1130,8 +1130,8 @@ struct chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>
     if (!stored_.has_value()) {
       // First item - store it and create pipeline
       stored_.emplace(value_storage<InputTypes>(std::forward<InputTypes>(inputs))...);
-      pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
-                                           processing_style::incremental>(copy(composed)));
+      pipeline_.emplace(impl::make_pipeline<impl::types<InputTypes...>,
+                                           impl::processing_style::incremental>(copy(composed)));
     } else {
       // Compare current item with stored item
       bool same_chunk = compare_items(stored_.value(), inputs...);
@@ -1150,8 +1150,8 @@ struct chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>
         this->next.process_incremental(pipeline_->finish());
         // Reset: store new item and create new pipeline
         stored_.emplace(value_storage<InputTypes>(std::forward<InputTypes>(inputs))...);
-        pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
-                                             processing_style::incremental>(copy(composed)));
+        pipeline_.emplace(impl::make_pipeline<impl::types<InputTypes...>,
+                                             impl::processing_style::incremental>(copy(composed)));
       }
     }
   }
@@ -1171,9 +1171,9 @@ struct chunk_by_impl<StageProperties, types<InputTypes...>, Comparer, Composed>
 template<typename Comparer, typename... Stages>
 constexpr auto chunk_by(Comparer comparer, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return stage<chunk_by_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<chunk_by_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                Comparer,
                C>(std::move(comparer), compose(std::move(stages)...));
 }
@@ -1182,17 +1182,17 @@ constexpr auto chunk_by(Comparer comparer, Stages... stages) {
 template<typename StageProperties, typename InputTypes, typename Composed>
 struct chunk_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename Composed>
-struct chunk_impl<StageProperties, types<InputTypes...>, Composed>
-    : stage_impl<chunk_impl<StageProperties, types<InputTypes...>, Composed>> {
+struct chunk_impl<StageProperties, impl::types<InputTypes...>, Composed>
+    : impl::stage_impl<chunk_impl<StageProperties, impl::types<InputTypes...>, Composed>> {
   using base = typename chunk_impl::base;
 
-  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
-                                                    processing_style::incremental>(
+  using pipeline_type = decltype(impl::make_pipeline<impl::types<InputTypes...>,
+                                                    impl::processing_style::incremental>(
       std::declval<Composed>()));
 
-  using output_types = types<decltype(std::declval<pipeline_type>().finish())>;
+  using output_types = impl::types<decltype(std::declval<pipeline_type>().finish())>;
 
   size_t chunk_size;
   Composed composed;
@@ -1204,8 +1204,8 @@ struct chunk_impl<StageProperties, types<InputTypes...>, Composed>
 
     if (!pipeline_.has_value()) {
       // First item - create pipeline
-      pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
-                                           processing_style::incremental>(copy(composed)));
+      pipeline_.emplace(impl::make_pipeline<impl::types<InputTypes...>,
+                                           impl::processing_style::incremental>(copy(composed)));
     }
 
     pipeline_->process_incremental(std::forward<InputTypes>(inputs)...);
@@ -1216,8 +1216,8 @@ struct chunk_impl<StageProperties, types<InputTypes...>, Composed>
       this->next.process_incremental(pipeline_->finish());
       // Reset for next chunk
       current_count = 0;
-      pipeline_.emplace(spl::make_pipeline<types<InputTypes...>,
-                                           processing_style::incremental>(copy(composed)));
+      pipeline_.emplace(impl::make_pipeline<impl::types<InputTypes...>,
+                                           impl::processing_style::incremental>(copy(composed)));
     }
   }
 
@@ -1233,9 +1233,9 @@ struct chunk_impl<StageProperties, types<InputTypes...>, Composed>
 template<typename... Stages>
 constexpr auto chunk(size_t n, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return stage<chunk_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<chunk_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                C>(std::size_t{n}, compose(std::move(stages)...));
 }
 
@@ -1243,18 +1243,18 @@ constexpr auto chunk(size_t n, Stages... stages) {
 template<typename StageProperties, typename InputTypes, typename... Composed>
 struct tee_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename... Composed>
-struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
-    : stage_impl<tee_impl<StageProperties, types<InputTypes...>, Composed...>> {
+struct tee_impl<StageProperties, impl::types<InputTypes...>, Composed...>
+    : impl::stage_impl<tee_impl<StageProperties, impl::types<InputTypes...>, Composed...>> {
   using base = typename tee_impl::base;
 
   template<typename C>
-  using pipeline_type = decltype(spl::make_pipeline<types<InputTypes...>,
-                                                    processing_style::incremental>(
+  using pipeline_type = decltype(impl::make_pipeline<impl::types<InputTypes...>,
+                                                    impl::processing_style::incremental>(
       std::declval<C>()));
 
-  using output_types = types<decltype(std::declval<
+  using output_types = impl::types<decltype(std::declval<
       pipeline_type<Composed>>().finish())&&...>;
 
   std::tuple<pipeline_type<Composed>...> pipelines;
@@ -1280,17 +1280,17 @@ struct tee_impl<StageProperties, types<InputTypes...>, Composed...>
  private:
   template<typename C>
   static constexpr auto make_pipeline_helper(C c) {
-    return spl::make_pipeline<types<InputTypes...>,
-                              processing_style::incremental>(
+    return impl::make_pipeline<impl::types<InputTypes...>,
+                              impl::processing_style::incremental>(
         c);
   }
 };
 
 template<typename... Stages>
 constexpr auto tee_helper(Stages... stages) {
-  return stage<tee_impl,
-               processing_style::incremental,
-               processing_style::complete,
+  return impl::stage<tee_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::complete,
                std::remove_cvref_t<Stages>...>(std::move(stages)...);
 }
 
@@ -1314,9 +1314,9 @@ constexpr auto SkydownSplMakeGenerator(
     R>>) {
   return generator([begin = r.begin(), end = r.end()](auto &&out, auto&&... arg_stream)mutable {
     auto &&v = *begin;
-    if constexpr (calculate_type_v<decltype(out)>) {
+    if constexpr (impl::calculate_type_v<decltype(out)>) {
       return out(std::forward<decltype(arg_stream)>(arg_stream)...,
-          move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
+          detail::move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
               v)));
 
     } else {
@@ -1324,7 +1324,7 @@ constexpr auto SkydownSplMakeGenerator(
         return false;
       }
       out(std::forward<decltype(arg_stream)>(arg_stream)...,
-          move_if_movable_range<std::remove_cvref_t<
+          detail::move_if_movable_range<std::remove_cvref_t<
               R>>(std::forward<decltype(v)>(
               v)));
       ++begin;
@@ -1337,7 +1337,7 @@ constexpr auto SkydownSplMakeGenerator(
 template<typename Output, typename F>
 constexpr auto SkydownSplOutput(Output &&output,
                                 generator<F>&& g){
-  if constexpr (calculate_type_v<Output>) {
+  if constexpr (impl::calculate_type_v<Output>) {
     return g(std::forward<Output>(output));
   } else {
     while(output && g(std::forward<Output>(output))){}
@@ -1367,7 +1367,7 @@ inline constexpr auto iota(size_t start, size_t end) {
       return output(std::forward<decltype(args)>(args)...,size_t(start));
     };
 
-    if constexpr (calculate_type_v<decltype(output)>) {
+    if constexpr (impl::calculate_type_v<decltype(output)>) {
       return invoke();
     } else {
       if(start < end){
@@ -1398,33 +1398,33 @@ enum class chain_position {
 template<typename StageProperties, typename InputTypes, typename R, typename Position>
 struct chain_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename R, chain_position Position>
-struct chain_impl<StageProperties, types<InputTypes...>, R, std::integral_constant<chain_position, Position>>
-    : stage_impl<chain_impl<StageProperties, types<InputTypes...>, R, std::integral_constant<chain_position,Position>>> {
+struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_constant<chain_position, Position>>
+    : impl::stage_impl<chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_constant<chain_position,Position>>> {
   using base = typename chain_impl::base;
-  using output_types = types<InputTypes...>;
-  
+  using output_types = impl::types<InputTypes...>;
+
   [[no_unique_address]] R range;
   bool first_call = true;
-  
+
   constexpr void process_incremental(InputTypes... inputs) {
     if constexpr (Position == chain_position::before) {
       if (first_call) {
         first_call = false;
         // Output all items from the chained sequence before the first element
 
-        SkydownSplOutput(incremental_outputter{this->next}, range);
+        SkydownSplOutput(impl::incremental_outputter{this->next}, range);
       }
     }
     // Output the current input
     this->next.process_incremental(std::forward<InputTypes>(inputs)...);
   }
-  
+
   constexpr decltype(auto) finish() {
     if (first_call || Position == chain_position::after) {
       // Output all items from the chained sequence after all inputs
-      SkydownSplOutput(incremental_outputter{this->next}, range);
+      SkydownSplOutput(impl::incremental_outputter{this->next}, range);
     }
     return this->next.finish();
   }
@@ -1432,18 +1432,18 @@ struct chain_impl<StageProperties, types<InputTypes...>, R, std::integral_consta
 
 template<typename R>
 constexpr auto chain_before(R&& r) {
-  return stage<chain_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<chain_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                R,
                std::integral_constant<chain_position, chain_position::before>>(std::forward<R>(r));
 }
 
 template<typename R>
 constexpr auto chain_after(R&& r) {
-  return stage<chain_impl,
-               processing_style::incremental,
-               processing_style::incremental,
+  return impl::stage<chain_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
                R,
                std::integral_constant<chain_position, chain_position::after>>(std::forward<R>(r));
 }
@@ -1462,7 +1462,7 @@ template<typename... Types>
 using single_type_or_tuple_t = typename single_type_or_tuple<Types...>::type;
 
 constexpr inline auto last(){
-  return accumulate_in_place_with_init([]<typename... InputTypes>(types<InputTypes...>) {
+  return accumulate_in_place_with_init([]<typename... InputTypes>(impl::types<InputTypes...>) {
     return std::optional<single_type_or_tuple_t<std::remove_cvref_t<InputTypes>...>>{};
  }, [](auto &acc, auto &&... args) {
     acc.emplace(std::forward<decltype(args)>(args)...);
@@ -1475,7 +1475,7 @@ constexpr inline auto first(){
 
 template<typename Comp>
 constexpr auto min(Comp comp){
-  return accumulate_in_place_with_init([]<typename... InputTypes>(types<InputTypes...>) {
+  return accumulate_in_place_with_init([]<typename... InputTypes>(impl::types<InputTypes...>) {
     static_assert(sizeof...(InputTypes) == 1, "Cannot have max/min on multi-argument stream");
     return std::optional<std::remove_cvref_t<InputTypes>...>{};
  }, [comp = std::move(comp)](auto &acc, auto &&... args) {
@@ -1628,12 +1628,12 @@ struct optional_unwrapper{
   }
 
   template<is_optional U>
-  static constexpr auto wrap_error(types<U>, error_type){
+  static constexpr auto wrap_error(impl::types<U>, error_type){
     return std::remove_cvref_t<U>(std::nullopt);
   }
 
   template<typename U>
-  static constexpr auto wrap_error(types<U>, error_type){
+  static constexpr auto wrap_error(impl::types<U>, error_type){
     return std::optional<std::remove_cvref_t<U>>(std::nullopt);
   }
 
@@ -1661,19 +1661,19 @@ struct optional_unwrapper{
 
 
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes, typename Unwrapper>
 struct unwrap_impl<StageProperties,
-                     types<InputTypes...>, Unwrapper>
-    : stage_impl<unwrap_impl<StageProperties,
-                               types<InputTypes...>,Unwrapper>> {
+                     impl::types<InputTypes...>, Unwrapper>
+    : impl::stage_impl<unwrap_impl<StageProperties,
+                               impl::types<InputTypes...>,Unwrapper>> {
   using base = typename unwrap_impl::base;
   using output_types = decltype(Unwrapper::unwrap(
-      type_calculating_outputter(),
+      impl::type_calculating_outputter(),
       std::declval<InputTypes>()...));
 
 
-  static_assert(is_types<output_types>::value);
+  static_assert(detail::is_types<output_types>::value);
   using unwrapper = Unwrapper;
 
   std::optional<typename unwrapper::error_type> error;
@@ -1687,13 +1687,13 @@ struct unwrap_impl<StageProperties,
       done_ = true;
       error = unwrapper::get_error(std::as_const(inputs)...);
     } else{
-      unwrapper::unwrap(incremental_outputter{this->next}, static_cast<InputTypes>(inputs)...);
+      unwrapper::unwrap(impl::incremental_outputter{this->next}, static_cast<InputTypes>(inputs)...);
     }
   }
 
   constexpr decltype(auto) finish() {
     if(error.has_value()){
-      return unwrapper::wrap_error(types<decltype(this->next.finish())>(),*std::move(error));
+      return unwrapper::wrap_error(impl::types<decltype(this->next.finish())>(),*std::move(error));
     }else{
       return unwrapper::wrap_success(this->next.finish());
     }
@@ -1707,28 +1707,28 @@ struct unwrap_impl<StageProperties,
 };
 
 inline constexpr auto unwrap_optional(){
-  return stage<unwrap_impl,
-               processing_style::incremental,
-               processing_style::incremental, optional_unwrapper<0>>();
+  return impl::stage<unwrap_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental, optional_unwrapper<0>>();
 }
 
 template<size_t I>
 inline constexpr auto unwrap_optional_arg(){
-  return stage<unwrap_impl,
-               processing_style::incremental,
-               processing_style::incremental, optional_unwrapper<I>>();
+  return impl::stage<unwrap_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental, optional_unwrapper<I>>();
 }
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes>
 struct as_incremental_impl;
 
-// Partial specialization to extract types from types<...>
+// Partial specialization to extract types from impl::types<...>
 template<typename StageProperties, typename... InputTypes>
-struct as_incremental_impl<StageProperties, types<InputTypes...>>
-    : stage_impl<as_incremental_impl<StageProperties, types<InputTypes...>>> {
+struct as_incremental_impl<StageProperties, impl::types<InputTypes...>>
+    : impl::stage_impl<as_incremental_impl<StageProperties, impl::types<InputTypes...>>> {
   using base = typename as_incremental_impl::base;
-  using output_types = types<InputTypes...>;
+  using output_types = impl::types<InputTypes...>;
 
   constexpr decltype(auto) process_complete(InputTypes... inputs) {
     this->next.process_incremental(std::forward<InputTypes>(inputs)...);
@@ -1737,9 +1737,9 @@ struct as_incremental_impl<StageProperties, types<InputTypes...>>
 };
 
 inline constexpr auto as_incremental() {
-  return stage<as_incremental_impl,
-               processing_style::complete,
-               processing_style::incremental>();
+  return impl::stage<as_incremental_impl,
+               impl::processing_style::complete,
+               impl::processing_style::incremental>();
 }
 
 
