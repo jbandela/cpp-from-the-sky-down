@@ -197,7 +197,7 @@ template<typename Output, typename R>
 constexpr auto SkydownSplOutput(Output &&output,
                                 R &&r)requires(std::ranges::range<std::remove_cvref_t<
     R>>) {
-  if constexpr (output.calculate_type) {
+  if constexpr (spl::impl::calculate_type_v<Output>) {
     auto &&v = *r.begin();
     return output(
         detail::move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
