@@ -1321,11 +1321,43 @@ constexpr auto transform_cps(F f) {
                F>(std::move(f));
 }
 
+// Forward declaration for transform_impl
+template<typename StageProperties, typename InputTypes, typename F>
+struct transform_impl;
+
+// Partial specialization to extract types from impl::types<...>
+template<typename StageProperties, typename... InputTypes, typename F>
+struct transform_impl<StageProperties,
+                      impl::types<InputTypes...>,
+                      F>
+    : impl::stage_impl<transform_impl<StageProperties,
+                                      impl::types<InputTypes...>,
+                                      F>> {
+  using base = typename transform_impl::base;
+  using output_types = impl::types<std::invoke_result_t<F, InputTypes...>>;
+  [[no_unique_address]] F f{};
+
+  constexpr void process_incremental(InputTypes... inputs)
+      requires(impl::incremental_input<transform_impl>) {
+    this->next.process_incremental(std::invoke(f, static_cast<InputTypes>(inputs)...));
+  }
+
+  constexpr decltype(auto) process_complete(InputTypes... inputs)
+      requires(impl::complete_input<transform_impl>) {
+    return this->next.process_complete(std::invoke(f, static_cast<InputTypes>(inputs)...));
+  }
+
+  constexpr bool done() const {
+    return this->next.done();
+  }
+};
+
 template<typename F>
 constexpr auto transform(F f) {
-  return transform_cps([f = std::move(f)](auto &&out, auto &&... inputs) {
-    return out(std::invoke(f, std::forward<decltype(inputs)>(inputs)...));
-  });
+  return impl::stage<transform_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
+               F>(std::move(f));
 }
 
 template<size_t I, typename F>
@@ -1439,10 +1471,10 @@ constexpr auto transform_complete_cps(F f) {
 
 template<typename F>
 constexpr auto transform_complete(F f) {
-  return transform_complete_cps([f = std::move(f)](auto &&out,
-                                                   auto &&... inputs) {
-    return out(std::invoke(f, std::forward<decltype(inputs)>(inputs)...));
-  });
+  return impl::stage<transform_impl,
+               impl::processing_style::complete,
+               impl::processing_style::complete,
+               F>(std::move(f));
 }
 
 template<typename Comparator>
