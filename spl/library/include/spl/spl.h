@@ -197,7 +197,7 @@ template<typename Output, typename R>
 constexpr auto SkydownSplOutput(Output &&output,
                                 R &&r)requires(std::ranges::range<std::remove_cvref_t<
     R>>) {
-  if constexpr (impl::calculate_type_v<Output>) {
+  if constexpr (output.calculate_type) {
     auto &&v = *r.begin();
     return output(
         detail::move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
@@ -621,6 +621,7 @@ template<typename Range, typename... Stages>
 // STAGES
 // ============================================================================
 
+#if 0 // API Documentation - these forward declarations are for reference only
 // ============================================================================
 // Forward Declarations - User-facing Stage Functions
 // ============================================================================
@@ -834,6 +835,7 @@ constexpr auto SkydownSplMakeGenerator(R&& r);
 
 // Complete-to-incremental conversion
 inline constexpr auto as_incremental();
+#endif // API Documentation
 
 // ============================================================================
 // Implementation Details
@@ -1341,7 +1343,7 @@ constexpr auto transform_arg(F f) {
   });
 }
 
-inline constexpr auto enumerate(size_t start) {
+inline constexpr auto enumerate(size_t start = 0) {
   return transform_cps([i = start](auto&& out, auto&&... inputs) mutable {
     return out(i++, std::forward<decltype(inputs)>(inputs)...);
   });
