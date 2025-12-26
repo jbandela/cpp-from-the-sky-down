@@ -38,3 +38,6 @@ target_link_libraries(example_generators PRIVATE Skydown::spl)
 
 add_executable(example_pythagorean example_pythagorean.cpp)
 target_link_libraries(example_pythagorean PRIVATE Skydown::spl)
+
+add_executable(example_merge_intervals example_merge_intervals.cpp)
+target_link_libraries(example_merge_intervals PRIVATE Skydown::spl)
