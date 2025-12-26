@@ -1043,22 +1043,39 @@ constexpr auto flat_map_arg(F f) {
   });
 }
 
+// Forward declaration
+template<typename StageProperties, typename InputTypes, typename Predicate>
+struct filter_impl;
+
+// Partial specialization to extract types from impl::types<...>
+template<typename StageProperties, typename... InputTypes, typename Predicate>
+struct filter_impl<StageProperties,
+                   impl::types<InputTypes...>,
+                   Predicate>
+    : impl::stage_impl<filter_impl<StageProperties,
+                             impl::types<InputTypes...>,
+                             Predicate>> {
+  using base = typename filter_impl::base;
+  using output_types = impl::types<InputTypes...>;
+  [[no_unique_address]] Predicate predicate{};
+
+  constexpr void process_incremental(InputTypes... inputs) {
+    if (std::invoke(predicate,inputs...)) {
+      this->next.process_incremental(static_cast<InputTypes>(inputs)...);
+    }
+  }
+
+  constexpr bool done() const {
+    return this->next.done();
+  }
+};
+
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
-  return flat_map([predicate =
-  std::move(predicate)]<typename Output, typename... Inputs>(Output &&output,
-                                                             Inputs &&... inputs) {
-    if constexpr (impl::calculate_type_v<Output>) {
-
-      return output(std::forward<Inputs>(inputs)...);
-
-    } else {
-      if (std::invoke(predicate, std::as_const(inputs)...)) {
-        output(std::forward<Inputs>(inputs)...);
-      }
-      return true;
-    }
-  });
+  return impl::stage<filter_impl,
+               impl::processing_style::incremental,
+               impl::processing_style::incremental,
+               Predicate>(std::move(predicate));
 }
 
 constexpr inline auto filter(){
