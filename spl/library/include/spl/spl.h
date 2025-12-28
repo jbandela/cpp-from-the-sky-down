@@ -330,14 +330,28 @@ class stage_instantiator {
   }
 };
 
+template<typename T>
+struct is_stage_instantiator:std::false_type {};
+
+template<template<typename, typename...> typename StageImpl, impl::processing_style InputProcessingStyle,
+    impl::processing_style OutputProcessingStyle,
+    typename Parameters, typename... TypeParameters>
+struct is_stage_instantiator<stage_instantiator<StageImpl,
+                                                 InputProcessingStyle,
+                                                 OutputProcessingStyle,
+                                                 Parameters,
+                                                 TypeParameters...>>:std::true_type {};
+
 } // namespace detail
 
 namespace impl {
 
+
+
 template<template<typename, typename...> typename StageImpl, processing_style InputProcessingStyle,
     processing_style OutputProcessingStyle,
     typename... TypeParameters, typename... Ts>
-constexpr auto stage(Ts &&... ts) {
+constexpr auto make_stage(Ts &&... ts) {
   return detail::stage_instantiator<StageImpl,
                             InputProcessingStyle,
                             OutputProcessingStyle,
@@ -377,9 +391,9 @@ static_assert(is_types<output_types>::value);
 };
 
 inline constexpr auto values() {
-  return impl::stage<values_impl,
-               impl::processing_style::complete,
-               impl::processing_style::incremental>();
+  return spl::impl::make_stage<values_impl,
+               spl::impl::processing_style::complete,
+               spl::impl::processing_style::incremental>();
 }
 
 } // namespace detail
@@ -400,9 +414,48 @@ struct composed {
 template<typename F>
 composed(F) -> composed<F>;
 
+template<typename T>
+struct is_composed:std::false_type{};
+
+
+template<typename F>
+struct is_composed<composed<F>>:std::true_type{};
+
+
+
 } // namespace detail
 
-template<typename... Ts>
+namespace impl{
+  template<typename T>
+  concept composed = detail::is_composed<std::remove_cvref_t<T>>::value;
+
+  template<typename T>
+  concept stage_instantiator = detail::is_stage_instantiator<std::remove_cvref_t<T>>::value;
+
+  template<typename T>
+  concept stage = stage_instantiator<T> || composed<T>;
+}
+
+namespace detail {
+  template<typename T, spl::impl::composed Composed>
+  struct t_and_composed{
+    [[no_unique_address]] T t;
+    [[no_unique_address]] Composed composed;
+  };
+
+  template<typename T>
+  struct is_t_and_composed:std::false_type{};
+
+  template<typename T, spl::impl::composed Composed>
+  struct is_t_and_composed<t_and_composed<T,Composed>>:std::true_type{};
+
+  template<typename T>
+  concept t_composed = is_t_and_composed<std::remove_cvref_t<
+      T>>::value;
+
+} // namespace detail
+
+template<impl::stage... Ts>
 constexpr auto compose(Ts &&... ts) {
   return detail::composed{[...args = std::forward<Ts>(ts)](auto&& prev, auto&&... next)constexpr mutable{
     if constexpr (sizeof...(next) == 1) {
@@ -414,6 +467,17 @@ constexpr auto compose(Ts &&... ts) {
           args));
     }
   }};
+}
+
+template<typename T, spl::impl::stage... Ts>
+requires(!impl::stage<T>)
+constexpr auto compose(T&& t, Ts&&... ts) {
+  auto c = compose(std::forward<Ts>(ts)...);
+  return detail::t_and_composed<std::remove_cvref_t<T>, decltype(c)>{
+      std::forward<T>(t),
+      std::move(c)
+  };
+
 }
 
 namespace detail {
@@ -616,6 +680,15 @@ template<typename Range, typename... Stages>
       std::forward<Stages>(stages)...);
   return chain.process_complete(std::forward<Range>(range));
 }
+
+template<detail::t_composed TAndComposed, impl::stage... Stages>
+[[nodiscard]] constexpr auto apply(TAndComposed &&t_and_composed,
+                                   Stages &&... stages) {
+  return apply(std::forward<TAndComposed>(t_and_composed).t,
+               std::forward<TAndComposed>(t_and_composed).composed,
+               std::forward<Stages>(stages)...);
+}
+
 
 // ============================================================================
 // STAGES
@@ -915,7 +988,7 @@ struct accumulate_in_place_impl<StageProperties, impl::types<InputTypes...>, Ini
 
 template<typename Init, typename F>
 constexpr auto accumulate_in_place_with_init(Init init, F f) {
-  return impl::stage<accumulate_in_place_impl,
+  return impl::make_stage<accumulate_in_place_impl,
               impl::processing_style::incremental,
               impl::processing_style::complete,
               decltype(init),
@@ -1014,7 +1087,7 @@ struct IdentityOutputCalculator {
 
 template<typename F>
 constexpr auto flat_map(F f) {
-  return impl::stage<flat_map_impl,
+  return impl::make_stage<flat_map_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                F>(std::move(f));
@@ -1072,7 +1145,7 @@ struct filter_impl<StageProperties,
 
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
-  return impl::stage<filter_impl,
+  return impl::make_stage<filter_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                Predicate>(std::move(predicate));
@@ -1270,7 +1343,7 @@ struct filter_duplicates_impl<StageProperties, impl::types<InputTypes...>>
 };
 
 constexpr auto filter_duplicates() {
-  return impl::stage<filter_duplicates_impl,
+  return impl::make_stage<filter_duplicates_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental>();
 }
@@ -1315,7 +1388,7 @@ struct transform_cps_impl<StageProperties, impl::types<InputTypes...>, F>
 
 template<typename F>
 constexpr auto transform_cps(F f) {
-  return impl::stage<transform_cps_impl,
+  return impl::make_stage<transform_cps_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                F>(std::move(f));
@@ -1354,7 +1427,7 @@ struct transform_impl<StageProperties,
 
 template<typename F>
 constexpr auto transform(F f) {
-  return impl::stage<transform_impl,
+  return impl::make_stage<transform_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                F>(std::move(f));
@@ -1463,7 +1536,7 @@ constexpr auto construct() {
 
 template<typename F>
 constexpr auto transform_complete_cps(F f) {
-  return impl::stage<transform_cps_impl,
+  return impl::make_stage<transform_cps_impl,
                impl::processing_style::complete,
                impl::processing_style::complete,
                F>(std::move(f));
@@ -1471,7 +1544,7 @@ constexpr auto transform_complete_cps(F f) {
 
 template<typename F>
 constexpr auto transform_complete(F f) {
-  return impl::stage<transform_impl,
+  return impl::make_stage<transform_impl,
                impl::processing_style::complete,
                impl::processing_style::complete,
                F>(std::move(f));
@@ -1741,7 +1814,7 @@ struct group_by_impl<StageProperties,
 template<typename MapType = detail::std_map, typename SelectorF, typename... Stages>
 constexpr auto group_by(SelectorF selector_f, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return impl::stage<group_by_impl,
+  return impl::make_stage<group_by_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                SelectorF,
@@ -1835,7 +1908,7 @@ struct chunk_by_impl<StageProperties, impl::types<InputTypes...>, Comparer, Comp
 template<typename Comparer, typename... Stages>
 constexpr auto chunk_by(Comparer comparer, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return impl::stage<chunk_by_impl,
+  return impl::make_stage<chunk_by_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                Comparer,
@@ -1897,7 +1970,7 @@ struct chunk_impl<StageProperties, impl::types<InputTypes...>, Composed>
 template<typename... Stages>
 constexpr auto chunk(size_t n, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return impl::stage<chunk_impl,
+  return impl::make_stage<chunk_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                C>(std::size_t{n}, compose(std::move(stages)...));
@@ -1952,7 +2025,7 @@ struct tee_impl<StageProperties, impl::types<InputTypes...>, Composed...>
 
 template<typename... Stages>
 constexpr auto tee_helper(Stages... stages) {
-  return impl::stage<tee_impl,
+  return impl::make_stage<tee_impl,
                impl::processing_style::incremental,
                impl::processing_style::complete,
                std::remove_cvref_t<Stages>...>(std::move(stages)...);
@@ -2095,7 +2168,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
 
 template<typename R>
 constexpr auto chain_before(R&& r) {
-  return impl::stage<chain_impl,
+  return impl::make_stage<chain_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                R,
@@ -2104,7 +2177,7 @@ constexpr auto chain_before(R&& r) {
 
 template<typename R>
 constexpr auto chain_after(R&& r) {
-  return impl::stage<chain_impl,
+  return impl::make_stage<chain_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                R,
@@ -2369,14 +2442,14 @@ struct unwrap_impl<StageProperties,
 };
 
 inline constexpr auto unwrap_optional(){
-  return impl::stage<unwrap_impl,
+  return impl::make_stage<unwrap_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental, optional_unwrapper<0>>();
 }
 
 template<size_t I>
 inline constexpr auto unwrap_optional_arg(){
-  return impl::stage<unwrap_impl,
+  return impl::make_stage<unwrap_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental, optional_unwrapper<I>>();
 }
@@ -2399,7 +2472,7 @@ struct as_incremental_impl<StageProperties, impl::types<InputTypes...>>
 };
 
 inline constexpr auto as_incremental() {
-  return impl::stage<as_incremental_impl,
+  return impl::make_stage<as_incremental_impl,
                impl::processing_style::complete,
                impl::processing_style::incremental>();
 }

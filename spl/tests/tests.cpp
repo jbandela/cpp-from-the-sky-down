@@ -553,7 +553,7 @@ TEST(SplTest, SwizzleSingle) {
   EXPECT_THAT(constexpr_swizzle_single_test(), 15);
 }
 
-auto PythagoreanTriples() {
+constexpr auto pythagorean_triples() {
   auto zip_flat = [](auto f) {
     return spl::compose(spl::zip_result(f), spl::flatten());
   };
@@ -573,14 +573,10 @@ TEST(SplTest, PythagoreanTriples) {
     return spl::compose(spl::zip_result(f), spl::flatten());
   };
   auto triples = spl::apply(
-      spl::iota(1),
-      zip_flat([](int c) { return spl::iota(1, c + 1); }),
-      zip_flat([](int c, int a) { return spl::iota(a, c + 1); }),
-      spl::filter([](int c, int a, int b) { return a * a + b * b == c * c; }),
-      spl::swizzle<1, 2, 0>(),
-      spl::take(10),
-      spl::make_tuple(),
-      spl::to_vector()
+    pythagorean_triples(),
+    spl::take(10),
+    spl::make_tuple(),
+    spl::to_vector()
   );
 
   using triple = std::tuple<int, int, int>;
