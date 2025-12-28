@@ -954,6 +954,8 @@ struct value_storage<T&&> {
   }
 };
 
+namespace detail {
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename Init, typename F>
 struct accumulate_in_place_impl;
@@ -985,10 +987,11 @@ struct accumulate_in_place_impl<StageProperties, impl::types<InputTypes...>, Ini
 
 };
 
+} // namespace detail
 
 template<typename Init, typename F>
 constexpr auto accumulate_in_place_with_init(Init init, F f) {
-  return impl::make_stage<accumulate_in_place_impl,
+  return impl::make_stage<detail::accumulate_in_place_impl,
               impl::processing_style::incremental,
               impl::processing_style::complete,
               decltype(init),
@@ -1048,6 +1051,8 @@ constexpr auto count() {
   return accumulate_in_place(size_t{0}, [](size_t& c, auto&&...) { ++c; });
 }
 
+namespace detail {
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename F>
 struct flat_map_impl;
@@ -1085,9 +1090,11 @@ struct IdentityOutputCalculator {
   using output_types = impl::types<Ts...>;
 };
 
+} // namespace detail
+
 template<typename F>
 constexpr auto flat_map(F f) {
-  return impl::make_stage<flat_map_impl,
+  return impl::make_stage<detail::flat_map_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                F>(std::move(f));
@@ -1116,6 +1123,8 @@ constexpr auto flat_map_arg(F f) {
   });
 }
 
+namespace detail {
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename Predicate>
 struct filter_impl;
@@ -1143,9 +1152,11 @@ struct filter_impl<StageProperties,
   }
 };
 
+} // namespace detail
+
 template<typename Predicate>
 constexpr auto filter(Predicate predicate) {
-  return impl::make_stage<filter_impl,
+  return impl::make_stage<detail::filter_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                Predicate>(std::move(predicate));
@@ -1302,6 +1313,8 @@ constexpr auto repeat_while(Predicate predicate) {
   });
 }
 
+namespace detail {
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes>
 struct filter_duplicates_impl;
@@ -1342,11 +1355,15 @@ struct filter_duplicates_impl<StageProperties, impl::types<InputTypes...>>
   }
 };
 
+} // namespace detail
+
 constexpr auto filter_duplicates() {
-  return impl::make_stage<filter_duplicates_impl,
+  return impl::make_stage<detail::filter_duplicates_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental>();
 }
+
+namespace detail {
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename F>
@@ -1386,13 +1403,17 @@ struct transform_cps_impl<StageProperties, impl::types<InputTypes...>, F>
   }
 };
 
+} // namespace detail
+
 template<typename F>
 constexpr auto transform_cps(F f) {
-  return impl::make_stage<transform_cps_impl,
+  return impl::make_stage<detail::transform_cps_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                F>(std::move(f));
 }
+
+namespace detail {
 
 // Forward declaration for transform_impl
 template<typename StageProperties, typename InputTypes, typename F>
@@ -1425,9 +1446,11 @@ struct transform_impl<StageProperties,
   }
 };
 
+} // namespace detail
+
 template<typename F>
 constexpr auto transform(F f) {
-  return impl::make_stage<transform_impl,
+  return impl::make_stage<detail::transform_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                F>(std::move(f));
@@ -1536,7 +1559,7 @@ constexpr auto construct() {
 
 template<typename F>
 constexpr auto transform_complete_cps(F f) {
-  return impl::make_stage<transform_cps_impl,
+  return impl::make_stage<detail::transform_cps_impl,
                impl::processing_style::complete,
                impl::processing_style::complete,
                F>(std::move(f));
@@ -1544,7 +1567,7 @@ constexpr auto transform_complete_cps(F f) {
 
 template<typename F>
 constexpr auto transform_complete(F f) {
-  return impl::make_stage<transform_impl,
+  return impl::make_stage<detail::transform_impl,
                impl::processing_style::complete,
                impl::processing_style::complete,
                F>(std::move(f));
@@ -1751,6 +1774,8 @@ struct std_map {
 };
 }
 
+namespace detail {
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename SelectorF, typename Composed, typename MapType = detail::std_map>
 struct group_by_impl;
@@ -1811,16 +1836,20 @@ struct group_by_impl<StageProperties,
 
 };
 
+} // namespace detail
+
 template<typename MapType = detail::std_map, typename SelectorF, typename... Stages>
 constexpr auto group_by(SelectorF selector_f, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return impl::make_stage<group_by_impl,
+  return impl::make_stage<detail::group_by_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                SelectorF,
                C,
                MapType>(std::move(selector_f), compose(std::move(stages)...));
 }
+
+namespace detail {
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename Comparer, typename Composed>
@@ -1905,15 +1934,19 @@ struct chunk_by_impl<StageProperties, impl::types<InputTypes...>, Comparer, Comp
   }
 };
 
+} // namespace detail
+
 template<typename Comparer, typename... Stages>
 constexpr auto chunk_by(Comparer comparer, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return impl::make_stage<chunk_by_impl,
+  return impl::make_stage<detail::chunk_by_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                Comparer,
                C>(std::move(comparer), compose(std::move(stages)...));
 }
+
+namespace detail {
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename Composed>
@@ -1967,14 +2000,18 @@ struct chunk_impl<StageProperties, impl::types<InputTypes...>, Composed>
   }
 };
 
+} // namespace detail
+
 template<typename... Stages>
 constexpr auto chunk(size_t n, Stages... stages) {
   using C = decltype(compose(std::move(stages)...));
-  return impl::make_stage<chunk_impl,
+  return impl::make_stage<detail::chunk_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                C>(std::size_t{n}, compose(std::move(stages)...));
 }
+
+namespace detail {
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename... Composed>
@@ -2023,9 +2060,11 @@ struct tee_impl<StageProperties, impl::types<InputTypes...>, Composed...>
   }
 };
 
+} // namespace detail
+
 template<typename... Stages>
 constexpr auto tee_helper(Stages... stages) {
-  return impl::make_stage<tee_impl,
+  return impl::make_stage<detail::tee_impl,
                impl::processing_style::incremental,
                impl::processing_style::complete,
                std::remove_cvref_t<Stages>...>(std::move(stages)...);
@@ -2130,6 +2169,8 @@ enum class chain_position {
   after
 };
 
+namespace detail {
+
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename R, typename Position>
 struct chain_impl;
@@ -2166,9 +2207,11 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
   }
 };
 
+} // namespace detail
+
 template<typename R>
 constexpr auto chain_before(R&& r) {
-  return impl::make_stage<chain_impl,
+  return impl::make_stage<detail::chain_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                R,
@@ -2177,7 +2220,7 @@ constexpr auto chain_before(R&& r) {
 
 template<typename R>
 constexpr auto chain_after(R&& r) {
-  return impl::make_stage<chain_impl,
+  return impl::make_stage<detail::chain_impl,
                impl::processing_style::incremental,
                impl::processing_style::incremental,
                R,
@@ -2281,6 +2324,8 @@ constexpr auto push_back_into(C& c){
   });
 }
 
+
+namespace detail {
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes, typename Unwrapper>
@@ -2441,18 +2486,22 @@ struct unwrap_impl<StageProperties,
 
 };
 
+} // namespace detail
+
 inline constexpr auto unwrap_optional(){
-  return impl::make_stage<unwrap_impl,
+  return impl::make_stage<detail::unwrap_impl,
                impl::processing_style::incremental,
-               impl::processing_style::incremental, optional_unwrapper<0>>();
+               impl::processing_style::incremental, detail::optional_unwrapper<0>>();
 }
 
 template<size_t I>
 inline constexpr auto unwrap_optional_arg(){
-  return impl::make_stage<unwrap_impl,
+  return impl::make_stage<detail::unwrap_impl,
                impl::processing_style::incremental,
-               impl::processing_style::incremental, optional_unwrapper<I>>();
+               impl::processing_style::incremental, detail::optional_unwrapper<I>>();
 }
+
+namespace detail {
 
 // Forward declaration
 template<typename StageProperties, typename InputTypes>
@@ -2471,14 +2520,16 @@ struct as_incremental_impl<StageProperties, impl::types<InputTypes...>>
   }
 };
 
+} // namespace detail
+
 inline constexpr auto as_incremental() {
-  return impl::make_stage<as_incremental_impl,
+  return impl::make_stage<detail::as_incremental_impl,
                impl::processing_style::complete,
                impl::processing_style::incremental>();
 }
 
 
-}
+} // namespace spl
 
 
 #endif //SKYDOWN_SPL_H_
