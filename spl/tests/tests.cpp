@@ -5642,3 +5642,136 @@ TEST(SplTest, EnumerateConstexpr) {
   EXPECT_EQ(constexpr_enumerate_test(), 360);
 }
 
+// partial_accumulate tests - these produce running totals (incremental->incremental)
+
+TEST(SplTest, PartialSumBasic) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v,
+      spl::partial_sum(),
+      spl::to_vector());
+  // Running sum: 1, 1+2=3, 3+3=6, 6+4=10, 10+5=15
+  EXPECT_THAT(result, ElementsAre(1, 3, 6, 10, 15));
+}
+
+TEST(SplTest, PartialSumEmpty) {
+  std::vector<int> v{};
+  auto result = spl::apply(v,
+      spl::partial_sum(),
+      spl::to_vector());
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(SplTest, PartialSumSingleElement) {
+  std::vector<int> v{42};
+  auto result = spl::apply(v,
+      spl::partial_sum(),
+      spl::to_vector());
+  EXPECT_THAT(result, ElementsAre(42));
+}
+
+TEST(SplTest, PartialAccumulateWithInitAndOp) {
+  std::vector<int> v{1, 2, 3, 4};
+  auto result = spl::apply(v,
+      spl::partial_accumulate(10, std::plus<>{}),
+      spl::to_vector());
+  // Starting from 10: 10+1=11, 11+2=13, 13+3=16, 16+4=20
+  EXPECT_THAT(result, ElementsAre(11, 13, 16, 20));
+}
+
+TEST(SplTest, PartialAccumulateProduct) {
+  std::vector<int> v{1, 2, 3, 4};
+  auto result = spl::apply(v,
+      spl::partial_accumulate(1, std::multiplies<>{}),
+      spl::to_vector());
+  // Running product: 1*1=1, 1*2=2, 2*3=6, 6*4=24
+  EXPECT_THAT(result, ElementsAre(1, 2, 6, 24));
+}
+
+TEST(SplTest, PartialAccumulateInPlace) {
+  std::vector<int> v{1, 2, 3, 4, 5};
+  auto result = spl::apply(v,
+      spl::partial_accumulate_in_place(0, [](int& acc, int x) { acc += x; }),
+      spl::to_vector());
+  EXPECT_THAT(result, ElementsAre(1, 3, 6, 10, 15));
+}
+
+TEST(SplTest, PartialAccumulateInPlaceMax) {
+  std::vector<int> v{3, 1, 4, 1, 5, 9, 2, 6};
+  auto result = spl::apply(v,
+      spl::partial_accumulate_in_place(std::numeric_limits<int>::min(),
+          [](int& acc, int x) { acc = std::max(acc, x); }),
+      spl::to_vector());
+  // Running max: 3, 3, 4, 4, 5, 9, 9, 9
+  EXPECT_THAT(result, ElementsAre(3, 3, 4, 4, 5, 9, 9, 9));
+}
+
+TEST(SplTest, PartialAccumulateInPlaceWithInit) {
+  std::vector<int> v{1, 2, 3};
+  auto result = spl::apply(v,
+      spl::partial_accumulate_in_place_with_init(
+          []<typename... Types>(spl::impl::types<Types...>) {
+            return int{100};
+          },
+          [](int& acc, int x) { acc += x; }),
+      spl::to_vector());
+  // Starting from 100: 100+1=101, 101+2=103, 103+3=106
+  EXPECT_THAT(result, ElementsAre(101, 103, 106));
+}
+
+TEST(SplTest, PartialAccumulateWithFilter) {
+  std::vector<int> v{1, 2, 3, 4, 5, 6, 7, 8};
+  auto result = spl::apply(v,
+      spl::filter([](int x) { return x % 2 == 0; }),
+      spl::partial_sum(),
+      spl::to_vector());
+  // Filter: 2, 4, 6, 8
+  // Running sum: 2, 6, 12, 20
+  EXPECT_THAT(result, ElementsAre(2, 6, 12, 20));
+}
+
+TEST(SplTest, PartialAccumulateChained) {
+  std::vector<int> v{1, 2, 3, 4};
+  auto result = spl::apply(v,
+      spl::partial_sum(),
+      spl::partial_sum(),
+      spl::to_vector());
+  // First partial_sum: 1, 3, 6, 10
+  // Second partial_sum: 1, 4, 10, 20
+  EXPECT_THAT(result, ElementsAre(1, 4, 10, 20));
+}
+
+constexpr auto constexpr_partial_sum_test() {
+  constexpr std::array v{1, 2, 3, 4, 5};
+  return spl::apply(v,
+      spl::partial_sum(),
+      spl::last());
+  // Running sum ends at 15
+}
+
+TEST(SplTest, PartialSumConstexpr) {
+  static_assert(constexpr_partial_sum_test().value() == 15);
+  EXPECT_EQ(constexpr_partial_sum_test().value(), 15);
+}
+
+constexpr auto constexpr_partial_accumulate_test() {
+  constexpr std::array v{1, 2, 3, 4};
+  return spl::apply(v,
+      spl::partial_accumulate(1, std::multiplies<>{}),
+      spl::sum());
+  // Running product: 1, 2, 6, 24
+  // Sum: 1+2+6+24 = 33
+}
+
+TEST(SplTest, PartialAccumulateConstexpr) {
+  static_assert(constexpr_partial_accumulate_test() == 33);
+  EXPECT_EQ(constexpr_partial_accumulate_test(), 33);
+}
+
+TEST(SplTest, PartialAccumulateString) {
+  std::vector<std::string> v{"a", "b", "c"};
+  auto result = spl::apply(v,
+      spl::partial_accumulate(std::string{}, std::plus<>{}),
+      spl::to_vector());
+  EXPECT_THAT(result, ElementsAre("a", "ab", "abc"));
+}
+

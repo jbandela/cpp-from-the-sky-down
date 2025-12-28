@@ -1054,6 +1054,87 @@ constexpr auto count() {
 namespace detail {
 
 // Forward declaration
+template<typename StageProperties, typename InputTypes, typename Init, typename F>
+struct partial_accumulate_in_place_impl;
+
+// Partial specialization to extract types from impl::types<...>
+template<typename StageProperties, typename... InputTypes, typename Init, typename F>
+struct partial_accumulate_in_place_impl<StageProperties, impl::types<InputTypes...>, Init, F>
+    : impl::stage_impl<partial_accumulate_in_place_impl<StageProperties,
+                                          impl::types<InputTypes...>,
+                                          Init,
+                                          F>> {
+  using base = typename partial_accumulate_in_place_impl::base;
+  using accumulated_type = std::invoke_result_t<
+      Init,
+      impl::types<InputTypes...>>;
+  static_assert(!std::is_same_v<accumulated_type, void>);
+  using output_types = impl::types<std::add_const_t<accumulated_type> &&>;
+  [[no_unique_address]] Init init;
+  [[no_unique_address]] F f{};
+  [[no_unique_address]] accumulated_type accumulated = std::invoke(init,impl::types<InputTypes...>());
+
+  constexpr decltype(auto) process_incremental(InputTypes... inputs) {
+    std::invoke(f, accumulated, std::forward<InputTypes>(inputs)...);
+    this->next.process_incremental(static_cast<std::add_const_t<accumulated_type>&&>(accumulated));
+  }
+};
+
+} // namespace detail
+
+template<typename Init, typename F>
+constexpr auto partial_accumulate_in_place_with_init(Init init, F f) {
+  return impl::make_stage<detail::partial_accumulate_in_place_impl,
+              impl::processing_style::incremental,
+              impl::processing_style::incremental,
+              decltype(init),
+              F>(
+     std::move(init), std::move(f));
+}
+
+template<typename T, typename F>
+constexpr auto partial_accumulate_in_place(T t, F f) {
+  auto init = [t = std::move(t)](auto) mutable { return std::move(t); };
+  return partial_accumulate_in_place_with_init(std::move(init), std::move(f));
+}
+
+template<typename T, typename F>
+constexpr auto partial_accumulate(T t, F f) {
+  return partial_accumulate_in_place(std::forward<T>(t),
+                             [f = std::move(f)](auto &accumulated,
+                                                auto &&v) {
+                               accumulated =
+                                   std::invoke(f,
+                                               accumulated,
+                                               std::forward<decltype(v)>(
+                                                   v));
+                             });
+}
+
+template<typename F>
+constexpr auto partial_accumulate(F f) {
+  return partial_accumulate_in_place_with_init([]<typename T, typename... Types>(impl::types<T,Types...>) {
+                               static_assert(sizeof...(Types) == 0,
+                                             "partial_accumulate without an explicit init needs to only have one input");
+                               return std::remove_cvref_t<T>();
+                             },
+                             [f = std::move(f)](auto &accumulated,
+                                                auto &&v) {
+                               accumulated =
+                                   std::invoke(f,
+                                               accumulated,
+                                               std::forward<decltype(v)>(
+                                                   v));
+                             });
+}
+
+constexpr auto partial_sum() {
+  return partial_accumulate(std::plus<>{});
+}
+
+namespace detail {
+
+// Forward declaration
 template<typename StageProperties, typename InputTypes, typename F>
 struct flat_map_impl;
 
