@@ -331,6 +331,54 @@ spl::apply(std::vector{1, 2, 3},
 // {2, 4, 6}
 ```
 
+### `partial_sum()`
+
+Output running sum for each element.
+
+```cpp
+spl::apply(std::vector{1, 2, 3, 4, 5},
+    spl::partial_sum(),
+    spl::to_vector()
+);
+// {1, 3, 6, 10, 15}
+```
+
+### `partial_accumulate(f)`
+
+Output running accumulation using a binary function.
+
+```cpp
+spl::apply(std::vector{1, 2, 3, 4},
+    spl::partial_accumulate(std::multiplies<>{}),
+    spl::to_vector()
+);
+// {1, 2, 6, 24}
+```
+
+### `partial_accumulate(init, f)`
+
+Output running accumulation with an explicit initial value.
+
+```cpp
+spl::apply(std::vector{1, 2, 3},
+    spl::partial_accumulate(10, std::plus<>{}),
+    spl::to_vector()
+);
+// {11, 13, 16}
+```
+
+### `partial_accumulate_in_place(init, f)`
+
+Output running accumulation by mutating the accumulator in place.
+
+```cpp
+spl::apply(std::vector{1, 2, 3},
+    spl::partial_accumulate_in_place(0, [](int& acc, int x) { acc += x; }),
+    spl::to_vector()
+);
+// {1, 3, 6}
+```
+
 ### `for_each(f)`
 
 Execute a function for each element (for side effects).
@@ -844,7 +892,7 @@ enum class processing_style {
 
 ## Creating Custom Stages
 
-### `stage<Impl, InputStyle, OutputStyle, Params...>(args...)`
+### `make_stage<Impl, InputStyle, OutputStyle, Params...>(args...)`
 
 Factory function to create stage instantiators.
 
@@ -874,7 +922,7 @@ struct my_stage_impl<StageProperties, spl::impl::types<InputTypes...>, F>
 
 template<typename F>
 constexpr auto my_stage(F f) {
-    return spl::impl::stage<my_stage_impl,
+    return spl::impl::make_stage<my_stage_impl,
                            spl::impl::processing_style::incremental,
                            spl::impl::processing_style::incremental,
                            F>(std::move(f));
@@ -991,7 +1039,7 @@ struct double_impl<StageProperties, spl::impl::types<InputTypes...>>
 };
 
 constexpr auto double_values() {
-    return spl::impl::stage<double_impl,
+    return spl::impl::make_stage<double_impl,
                            spl::impl::processing_style::incremental,
                            spl::impl::processing_style::incremental>();
 }

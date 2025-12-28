@@ -703,12 +703,26 @@ template<detail::t_composed TAndComposed, impl::stage... Stages>
 template<typename T, typename F>
 constexpr auto accumulate_in_place(T t, F f);
 
-
 template<typename T, typename F>
 constexpr auto accumulate(T t, F f);
 
 template<typename F>
 constexpr auto accumulate(F f);
+
+// Partial accumulation stages (incremental->incremental, outputs running accumulation)
+template<typename Init, typename F>
+constexpr auto partial_accumulate_in_place_with_init(Init init, F f);
+
+template<typename T, typename F>
+constexpr auto partial_accumulate_in_place(T t, F f);
+
+template<typename T, typename F>
+constexpr auto partial_accumulate(T t, F f);
+
+template<typename F>
+constexpr auto partial_accumulate(F f);
+
+constexpr auto partial_sum();
 
 template<typename F>
 constexpr auto for_each(F f);
