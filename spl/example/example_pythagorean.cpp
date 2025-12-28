@@ -4,16 +4,8 @@
 #include <spl/spl.h>
 #include <iostream>
 
-int main() {
-    std::cout << "=== Pythagorean Triples ===\n";
-    std::cout << "First 10 Pythagorean triples (a, b, c) where a^2 + b^2 = c^2:\n\n";
-
-    // Generate Pythagorean triples using nested iteration:
-    // For each c from 1 to infinity:
-    //   For each a from 1 to c:
-    //     For each b from a to c:
-    //       If a^2 + b^2 = c^2, output (a, b, c)
-    spl::apply(spl::iota(1),  // c: 1, 2, 3, ...
+constexpr auto pythagorean_triples(){
+ return spl::compose(spl::iota(1),  // c: 1, 2, 3, ...
         spl::zip_result([](size_t c) { return spl::iota(1, c + 1); }),  // a: 1..c
         spl::flatten(),
         spl::zip_result([](size_t c, size_t a) { return spl::iota(a, c + 1); }),  // b: a..c
@@ -21,7 +13,19 @@ int main() {
         spl::filter([](size_t c, size_t a, size_t b) {
             return a * a + b * b == c * c;
         }),
-        spl::swizzle<1, 2, 0>(),  // Reorder from (c, a, b) to (a, b, c)
+        spl::swizzle<1, 2, 0>()  // Reorder from (c, a, b) to (a, b, c)
+    );
+    
+
+
+}
+
+int main() {
+    std::cout << "=== Pythagorean Triples ===\n";
+    std::cout << "First 10 Pythagorean triples (a, b, c) where a^2 + b^2 = c^2:\n\n";
+
+   spl::apply(
+        pythagorean_triples(),
         spl::take(10),
         spl::for_each([](size_t a, size_t b, size_t c) {
             std::cout << a << "^2 + " << b << "^2 = " << c << "^2"
