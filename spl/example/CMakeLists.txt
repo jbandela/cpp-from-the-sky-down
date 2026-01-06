@@ -41,3 +41,6 @@ target_link_libraries(example_pythagorean PRIVATE Skydown::spl)
 
 add_executable(example_merge_intervals example_merge_intervals.cpp)
 target_link_libraries(example_merge_intervals PRIVATE Skydown::spl)
+
+add_executable(example_sushi_for_two example_sushi_for_two.cpp)
+target_link_libraries(example_sushi_for_two PRIVATE Skydown::spl)
