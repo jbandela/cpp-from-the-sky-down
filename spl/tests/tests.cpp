@@ -5775,3 +5775,36 @@ TEST(SplTest, PartialAccumulateString) {
   EXPECT_THAT(result, ElementsAre("a", "ab", "abc"));
 }
 
+// Non-copyable, non-movable type tests
+struct NonCopyableNonMovableInt {
+  int value;
+
+  explicit NonCopyableNonMovableInt(int v) : value(v) {}
+
+  NonCopyableNonMovableInt(const NonCopyableNonMovableInt&) = delete;
+  NonCopyableNonMovableInt& operator=(const NonCopyableNonMovableInt&) = delete;
+  NonCopyableNonMovableInt(NonCopyableNonMovableInt&&) = delete;
+  NonCopyableNonMovableInt& operator=(NonCopyableNonMovableInt&&) = delete;
+
+  int get() const { return value; }
+};
+
+TEST(SplTest, NonCopyableNonMovableTransformFilterAccumulate) {
+  // Create from vector of ints via transform
+  // Filter odds
+  // Transform to return a doubled one
+  // Sum to an integer
+  std::vector<int> v{1, 2, 3, 4, 5, 6};
+
+  auto result = spl::apply(v,
+      spl::transform([](int x) { return NonCopyableNonMovableInt(x); }),
+      spl::filter([](const NonCopyableNonMovableInt& x) { return x.get() % 2 == 1; }),
+      spl::transform([](const NonCopyableNonMovableInt& x) { return NonCopyableNonMovableInt(x.get() * 2); }),
+      spl::accumulate(0, [](int acc, const NonCopyableNonMovableInt& x) { return acc + x.get(); })
+  );
+
+  // Odds are 1, 3, 5 -> doubled: 2, 6, 10 -> sum: 18
+  EXPECT_EQ(result, 18);
+}
+
+

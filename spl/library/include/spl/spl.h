@@ -1523,7 +1523,7 @@ struct transform_impl<StageProperties,
                                       impl::types<InputTypes...>,
                                       F>> {
   using base = typename transform_impl::base;
-  using output_types = impl::types<std::invoke_result_t<F, InputTypes...>>;
+  using output_types = impl::types<std::invoke_result_t<F, InputTypes...>&&>;
   [[no_unique_address]] F f{};
 
   constexpr void process_incremental(InputTypes... inputs)
