@@ -2024,6 +2024,48 @@ TEST(SplTest, ChainAfterSingleElement) {
   EXPECT_THAT(result, ElementsAre(42, 1, 2, 3));
 }
 
+TEST(SplTest, ChainBeforeWithGenerator) {
+  auto gen = spl::generator([i = 0](auto &&out) mutable {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
+      return out(int(i++));
+    } else {
+      if (i >= 3) return false;
+      out(int(i++));
+      return true;
+    }
+  });
+
+  std::vector v{10, 20, 30};
+
+  auto result = spl::apply(v,
+                          spl::move(),
+                          spl::chain_before(std::move(gen)),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(0, 1, 2, 10, 20, 30));
+}
+
+TEST(SplTest, ChainAfterWithGenerator) {
+  auto gen = spl::generator([i = 100](auto &&out) mutable {
+    if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
+      return out(int(i++));
+    } else {
+      if (i >= 103) return false;
+      out(int(i++));
+      return true;
+    }
+  });
+
+  std::vector v{1, 2, 3};
+
+  auto result = spl::apply(v,
+                          spl::move(),
+                          spl::chain_after(std::move(gen)),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(1, 2, 3, 100, 101, 102));
+}
+
 // Sort tests
 constexpr auto constexpr_sort_test() {
   constexpr std::array v{3, 1, 4, 1, 5, 9, 2, 6};

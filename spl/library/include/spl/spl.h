@@ -2286,7 +2286,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
         first_call = false;
         // Output all items from the chained sequence before the first element
 
-        SkydownSplOutput(impl::incremental_outputter{this->next}, range);
+        SkydownSplOutput(impl::incremental_outputter{this->next}, std::move(range));
       }
     }
     // Output the current input
@@ -2296,7 +2296,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
   constexpr decltype(auto) finish() {
     if (first_call || Position == chain_position::after) {
       // Output all items from the chained sequence after all inputs
-      SkydownSplOutput(impl::incremental_outputter{this->next}, range);
+      SkydownSplOutput(impl::incremental_outputter{this->next}, std::move(range));
     }
     return this->next.finish();
   }
