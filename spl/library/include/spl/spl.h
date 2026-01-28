@@ -1974,13 +1974,13 @@ struct chunk_by_impl<StageProperties, impl::types<InputTypes...>, Comparer, Comp
     if constexpr (sizeof...(InputTypes) == 1) {
       // Single argument - pass directly
       return std::apply([&](auto&... stored) {
-        return std::invoke(comparer, std::as_const(*stored)..., std::as_const(current)...);
+        return std::invoke(comparer, spl::forward_as_const<decltype(*stored)>(*stored)..., std::as_const(current)...);
       }, stored_tuple);
     } else {
       // Multiple arguments - wrap in forward_as_tuple
       return std::apply([&](auto&... stored) {
         return std::invoke(comparer,
-                           std::forward_as_tuple(std::as_const(*stored)...),
+                           std::forward_as_tuple(spl::forward_as_const<decltype(*stored)>(*stored)...),
                            std::forward_as_tuple(std::as_const(current)...));
       }, stored_tuple);
     }

@@ -20,7 +20,7 @@ int main() {
         spl::sort(),
         spl::chunk_by(
             // Two intervals overlap if current.first <= previous.second
-            [](auto& prev, auto& curr) {
+            [](auto&& prev, auto&& curr) {
                 return curr.first <= prev.second;
             },
             // Accumulate each chunk into a single merged interval
