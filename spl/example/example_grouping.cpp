@@ -65,10 +65,15 @@ int main() {
     spl::apply(runs,
         spl::chunk_by(
             [](int a, int b) { return a == b; },  // Same value
-            spl::to_vector()
+            spl::tee(
+                spl::compose(spl::first(), spl::deref_complete()),
+                spl::count()
+            ),
+            spl::make_tuple_complete()
         ),
-        spl::for_each([](const std::vector<int>& run) {
-            std::cout << "Run of " << run[0] << " (length " << run.size() << ")\n";
+        spl::expand_tuple(),
+        spl::for_each([](int i, int len) {
+            std::cout << "Run of " << i << " (length " << len << ")\n";
         })
     );
 
