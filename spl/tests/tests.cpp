@@ -2,8 +2,17 @@
 #include <spl/spl.h> // Include your library's header
 #include <deque>
 #include <list>
+#include <span>
 
 namespace {
+
+static_assert(spl::detail::movable_range<std::vector<int>&&>);
+static_assert(!spl::detail::movable_range<std::vector<int>&>);
+
+static_assert(!spl::detail::movable_range<std::span<int>&&>);
+static_assert(!spl::detail::movable_range<std::span<int>&>);
+
+
 
 using ::testing::Pair;
 using ::testing::ElementsAre;
@@ -145,6 +154,44 @@ TEST(SplTest, ConstexprCalculateTakeLValueStage) {
   static_assert(calculate_take_lvalue_stage() == 10);
   EXPECT_THAT(calculate_take_lvalue_stage(), 10);
 
+}
+
+TEST(SplTest, MoveIfMovableLValue){
+  std::array v{1, 2, 3, 4};
+  return spl::apply(v,
+                    spl::transform([](auto&& i) { 
+                      static_assert(std::is_lvalue_reference_v<decltype(i)>);
+                      return i * 2; }),
+                    spl::for_each([](auto&&){}));
+}
+
+TEST(SplTest, MoveIfMovableRValue){
+  std::array v{1, 2, 3, 4};
+  return spl::apply(std::move(v),
+                    spl::transform([](auto&& i) { 
+                      static_assert(std::is_rvalue_reference_v<decltype(i)>);
+                      return i * 2; }),
+                    spl::for_each([](auto&&){}));
+}
+
+TEST(SplTest, MoveIfMovableLValueSpan){
+  std::array a{1, 2, 3, 4};
+  std::span v(a);
+  return spl::apply(v,
+                    spl::transform([](auto&& i) { 
+                      static_assert(std::is_lvalue_reference_v<decltype(i)>);
+                      return i * 2; }),
+                    spl::for_each([](auto&&){}));
+}
+
+TEST(SplTest, MoveIfMovableRValueSpan){
+  std::array a{1, 2, 3, 4};
+  std::span v(a);
+  return spl::apply(std::move(v),
+                    spl::transform([](auto&& i) { 
+                      static_assert(std::is_lvalue_reference_v<decltype(i)>);
+                      return i * 2; }),
+                    spl::for_each([](auto&&){}));
 }
 
 constexpr auto constexpr_group_by_test() {
@@ -2027,18 +2074,18 @@ TEST(SplTest, ChainAfterSingleElement) {
 TEST(SplTest, ChainBeforeWithGenerator) {
   auto gen = spl::generator([i = 0](auto &&out) mutable {
     if constexpr (spl::impl::calculate_type_v<decltype(out)>) {
-      return out(int(i++));
+      return out(i++);
     } else {
       if (i >= 3) return false;
-      out(int(i++));
+      out(i++);
       return true;
     }
   });
 
   std::vector v{10, 20, 30};
 
-  auto result = spl::apply(v,
-                          spl::move(),
+
+  auto result = spl::apply(std::move(v),
                           spl::chain_before(std::move(gen)),
                           spl::to_vector());
 

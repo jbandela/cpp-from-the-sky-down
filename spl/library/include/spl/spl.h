@@ -13,6 +13,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace spl {
 
@@ -175,14 +176,15 @@ constexpr decltype(auto) invoke_with_last_first(F&& f, Args&&... args) {
 
 template<typename R>
 concept movable_range = std::ranges::range<std::remove_cvref_t<R>>
-    && !std::same_as<decltype(std::ranges::begin(std::declval<R>())),
-                     decltype(std::ranges::begin(std::as_const(std::declval<R>())))>
+    && !std::same_as<decltype(std::ranges::begin(std::declval<std::remove_cvref_t<R>&>())),
+                     decltype(std::ranges::begin(std::as_const(
+                      std::declval<std::remove_cvref_t<R>&>())))>
     && std::is_rvalue_reference_v<R>;
 
 template<typename R, typename T>
 constexpr decltype(auto) move_if_movable_range(T &&t) requires(std::ranges::range<
     std::remove_cvref_t<R>>) {
-  return (t);
+  return std::forward<T>(t);
 }
 
 template<movable_range R, typename T>
@@ -200,15 +202,14 @@ constexpr auto SkydownSplOutput(Output &&output,
   if constexpr (spl::impl::calculate_type_v<Output>) {
     auto &&v = *r.begin();
     return output(
-        detail::move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
+        detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
             v)));
 
   } else {
     for (auto &&v : std::forward<R>(r)) {
       if (!output) return false;
       output(
-          detail::move_if_movable_range<std::remove_cvref_t<
-              R>>(std::forward<decltype(v)>(
+          detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
               v)));
     }
     return true;
@@ -2187,7 +2188,7 @@ constexpr auto SkydownSplMakeGenerator(
     auto &&v = *begin;
     if constexpr (impl::calculate_type_v<decltype(out)>) {
       return out(std::forward<decltype(arg_stream)>(arg_stream)...,
-          detail::move_if_movable_range<std::remove_cvref_t<R>>(std::forward<decltype(v)>(
+          detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
               v)));
 
     } else {
@@ -2195,8 +2196,7 @@ constexpr auto SkydownSplMakeGenerator(
         return false;
       }
       out(std::forward<decltype(arg_stream)>(arg_stream)...,
-          detail::move_if_movable_range<std::remove_cvref_t<
-              R>>(std::forward<decltype(v)>(
+          detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
               v)));
       ++begin;
       return true;
@@ -2286,7 +2286,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
         first_call = false;
         // Output all items from the chained sequence before the first element
 
-        SkydownSplOutput(impl::incremental_outputter{this->next}, std::move(range));
+        SkydownSplOutput(impl::incremental_outputter{this->next}, std::forward<R>(range));
       }
     }
     // Output the current input
@@ -2296,7 +2296,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
   constexpr decltype(auto) finish() {
     if (first_call || Position == chain_position::after) {
       // Output all items from the chained sequence after all inputs
-      SkydownSplOutput(impl::incremental_outputter{this->next}, std::move(range));
+      SkydownSplOutput(impl::incremental_outputter{this->next}, std::forward<R>(range));
     }
     return this->next.finish();
   }
