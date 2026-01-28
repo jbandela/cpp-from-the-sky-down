@@ -746,10 +746,13 @@ template<typename F>
 constexpr auto transform_complete(F f);
 
 template<typename F>
-constexpr auto transform_complete_cps(F f);
+constexpr auto transform_cps_complete(F f);
 
 template<size_t I, typename F>
 constexpr auto transform_arg_cps(F f);
+
+template<size_t I, typename F>
+constexpr auto transform_arg_cps_complete(F f);
 
 template<size_t I, typename F>
 constexpr auto transform_arg(F f);
@@ -1651,7 +1654,7 @@ constexpr auto construct() {
 }
 
 template<typename F>
-constexpr auto transform_complete_cps(F f) {
+constexpr auto transform_cps_complete(F f) {
   return impl::make_stage<detail::transform_cps_impl,
                impl::processing_style::complete,
                impl::processing_style::complete,
@@ -1667,8 +1670,8 @@ constexpr auto transform_complete(F f) {
 }
 
 template<size_t I, typename F>
-constexpr auto transform_arg_complete_cps(F f) {
-  return transform_complete_cps([f = std::move(f)](auto&& out, auto&&... inputs) {
+constexpr auto transform_arg_cps_complete(F f) {
+  return transform_cps_complete([f = std::move(f)](auto&& out, auto&&... inputs) {
     auto tuple = std::forward_as_tuple(std::forward<decltype(inputs)>(inputs)...);
 
     auto invoke = [&]<size_t... Before, size_t... After>(std::index_sequence<Before...>, std::index_sequence<After...>) {
@@ -1684,7 +1687,7 @@ constexpr auto transform_arg_complete_cps(F f) {
 
 template<size_t I, typename F>
 constexpr auto transform_arg_complete(F f) {
-  return transform_arg_complete_cps<I>([f = std::move(f)](auto&& out, auto&& before, auto&& arg, auto&& after) {
+  return transform_arg_cps_complete<I>([f = std::move(f)](auto&& out, auto&& before, auto&& arg, auto&& after) {
     return std::apply([&](auto&&... before_args) {
       return std::apply([&](auto&&... after_args) {
         return out(std::forward<decltype(before_args)>(before_args)...,
@@ -1697,7 +1700,7 @@ constexpr auto transform_arg_complete(F f) {
 
 template<typename Comparator>
 constexpr auto sort(Comparator comp) {
-  return transform_complete_cps([comp = std::move(comp)](auto &&out,
+  return transform_cps_complete([comp = std::move(comp)](auto &&out,
                                                          auto &&container) {
     auto sorted = std::forward<decltype(container)>(container);
     std::sort(sorted.begin(), sorted.end(), comp);
@@ -1711,7 +1714,7 @@ constexpr auto sort() {
 
 template<typename Comparator>
 constexpr auto stable_sort(Comparator comp) {
-  return transform_complete_cps([comp = std::move(comp)](auto &&out,
+  return transform_cps_complete([comp = std::move(comp)](auto &&out,
                                                          auto &&container) {
     auto sorted = std::forward<decltype(container)>(container);
     std::stable_sort(sorted.begin(), sorted.end(), comp);
@@ -1725,7 +1728,7 @@ constexpr auto stable_sort() {
 
 template<typename Comparator>
 constexpr auto partial_sort(size_t n, Comparator comp) {
-  return transform_complete_cps([n, comp = std::move(comp)](auto &&out,
+  return transform_cps_complete([n, comp = std::move(comp)](auto &&out,
                                                              auto &&container) {
     auto result = std::forward<decltype(container)>(container);
     auto middle = n < result.size() ? result.begin() + n : result.end();
@@ -1740,7 +1743,7 @@ constexpr auto partial_sort(size_t n) {
 
 template<typename Comparator>
 constexpr auto nth_element(size_t n, Comparator comp) {
-  return transform_complete_cps([n, comp = std::move(comp)](auto &&out,
+  return transform_cps_complete([n, comp = std::move(comp)](auto &&out,
                                                              auto &&container) {
     auto result = std::forward<decltype(container)>(container);
     auto nth = n < result.size() ? result.begin() + n : result.end();
@@ -1755,7 +1758,7 @@ constexpr auto nth_element(size_t n) {
 
 template<typename BinaryPredicate>
 constexpr auto unique(BinaryPredicate pred) {
-  return transform_complete_cps([pred = std::move(pred)](auto &&out,
+  return transform_cps_complete([pred = std::move(pred)](auto &&out,
                                                           auto &&container) {
     auto result = std::forward<decltype(container)>(container);
     auto new_end = std::unique(result.begin(), result.end(), pred);
@@ -1786,18 +1789,18 @@ inline constexpr auto make_pair() {
 }
 
 inline constexpr auto expand_tuple_complete() {
-  return transform_complete_cps([&](auto &&out, auto &&tuple) {
+  return transform_cps_complete([&](auto &&out, auto &&tuple) {
     return std::apply(out, std::forward<decltype(tuple)>(tuple));
   });
 }
 
 inline constexpr auto make_tuple_complete() {
-  return transform_complete_cps([&](auto &&out, auto &&... ts) {
+  return transform_cps_complete([&](auto &&out, auto &&... ts) {
     return out(std::make_tuple(std::forward<decltype(ts)>(ts)...));
   });
 }
 inline constexpr auto make_pair_complete() {
-  return transform_complete_cps([&](auto &&out, auto &&... ts) {
+  return transform_cps_complete([&](auto &&out, auto &&... ts) {
     return out(std::make_pair(std::forward<decltype(ts)>(ts)...));
   });
 }

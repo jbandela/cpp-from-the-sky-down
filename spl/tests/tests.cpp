@@ -871,11 +871,11 @@ TEST(SplTest, TransformCompleteMultiple) {
   EXPECT_EQ(constexpr_transform_complete_multiple_test(), 68);
 }
 
-constexpr auto constexpr_transform_complete_cps_test() {
+constexpr auto constexpr_transform_cps_complete_test() {
   constexpr std::array v{10, 20, 30};
   return spl::apply(v,
                     spl::sum(),
-                    spl::transform_complete_cps([](auto &&out, int x) {
+                    spl::transform_cps_complete([](auto &&out, int x) {
                       return out(x / 10, x % 10);
                     }),
                     spl::transform_complete([](int a, int b) {
@@ -884,9 +884,9 @@ constexpr auto constexpr_transform_complete_cps_test() {
 }
 
 TEST(SplTest, TransformCompleteCps) {
-  static_assert(constexpr_transform_complete_cps_test()
+  static_assert(constexpr_transform_cps_complete_test()
                     == 6);  // 60/10 + 60%10 = 6 + 0 = 6
-  EXPECT_EQ(constexpr_transform_complete_cps_test(), 6);
+  EXPECT_EQ(constexpr_transform_cps_complete_test(), 6);
 }
 
 TEST(SplTest, TransformCompleteWithVector) {
@@ -4247,7 +4247,7 @@ TEST(SplTest, TransformArgTypeChange) {
 }
 
 // ============================================================================
-// transform_arg_complete and transform_arg_complete_cps Tests
+// transform_arg_complete and transform_arg_cps_complete Tests
 // ============================================================================
 
 TEST(SplTest, TransformArgCompleteBasic) {
@@ -4327,7 +4327,7 @@ TEST(SplTest, TransformArgCompleteCpsBasic) {
 
   auto result = spl::apply(input,
     spl::expand_tuple_complete(),
-      spl::transform_arg_complete_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+      spl::transform_arg_cps_complete<1>([](auto&& out, auto&& before, int arg, auto&& after) {
         return out(std::get<0>(before), arg * 2, std::get<0>(after));
       }),
       spl::transform_complete([](auto&&... args) {
@@ -4343,7 +4343,7 @@ TEST(SplTest, TransformArgCompleteCpsFirstArg) {
 
   auto result = spl::apply(input,
     spl::expand_tuple_complete(),
-      spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+      spl::transform_arg_cps_complete<0>([](auto&& out, auto&& before, int arg, auto&& after) {
         static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(before)>> == 0);
         return out(arg * 10, std::get<0>(after));
       }),
@@ -4360,7 +4360,7 @@ TEST(SplTest, TransformArgCompleteCpsLastArg) {
 
   auto result = spl::apply(input,
     spl::expand_tuple_complete(),
-      spl::transform_arg_complete_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+      spl::transform_arg_cps_complete<1>([](auto&& out, auto&& before, int arg, auto&& after) {
         static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(after)>> == 0);
         return out(std::get<0>(before), arg * 10);
       }),
@@ -4377,7 +4377,7 @@ TEST(SplTest, TransformArgCompleteCpsSingleArg) {
 
   auto result = spl::apply(input,
     spl::expand_tuple_complete(),
-      spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+      spl::transform_arg_cps_complete<0>([](auto&& out, auto&& before, int arg, auto&& after) {
         static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(before)>> == 0);
         static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(after)>> == 0);
         return out(arg * 2);
@@ -4395,7 +4395,7 @@ TEST(SplTest, TransformArgCompleteCpsExpandArg) {
 
   auto result = spl::apply(input,
     spl::expand_tuple_complete(),
-      spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+      spl::transform_arg_cps_complete<0>([](auto&& out, auto&& before, int arg, auto&& after) {
         return out(arg, arg * 100, std::get<0>(after));
       }),
       spl::transform_complete([](auto&&... args) {
@@ -4424,7 +4424,7 @@ TEST(SplTest, TransformArgCompleteCpsConstexpr) {
     std::tuple<int, int> input{3, 7};
     return spl::apply(input,
     spl::expand_tuple_complete(),
-        spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        spl::transform_arg_cps_complete<0>([](auto&& out, auto&& before, int arg, auto&& after) {
           return out(arg * 10, std::get<0>(after));
         }),
         spl::transform_complete([](int a, int b) {
