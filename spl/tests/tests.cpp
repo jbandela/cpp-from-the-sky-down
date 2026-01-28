@@ -4247,6 +4247,195 @@ TEST(SplTest, TransformArgTypeChange) {
 }
 
 // ============================================================================
+// transform_arg_complete and transform_arg_complete_cps Tests
+// ============================================================================
+
+TEST(SplTest, TransformArgCompleteBasic) {
+  // Transform middle arg (index 1) in a tuple
+  std::tuple<int, int, int> input{1, 10, 100};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete<1>([](int x) { return x * 2; }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(1, 20, 100));
+}
+
+TEST(SplTest, TransformArgCompleteFirst) {
+  // Transform first arg (index 0)
+  std::tuple<int, int> input{5, 10};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete<0>([](int x) { return x * 10; }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(50, 10));
+}
+
+TEST(SplTest, TransformArgCompleteLast) {
+  // Transform last arg (index 1)
+  std::tuple<int, int> input{5, 10};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete<1>([](int x) { return x * 10; }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(5, 100));
+}
+
+TEST(SplTest, TransformArgCompleteSingle) {
+  // Single arg tuple
+  std::tuple<int> input{42};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete<0>([](int x) { return x * 2; }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(84));
+}
+
+TEST(SplTest, TransformArgCompleteTypeChange) {
+  // Transform arg to different type
+  std::tuple<int, int> input{5, 10};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete<1>([](int x) { return x * 0.5; }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(std::get<0>(result), 5);
+  EXPECT_DOUBLE_EQ(std::get<1>(result), 5.0);
+}
+
+TEST(SplTest, TransformArgCompleteCpsBasic) {
+  // Transform middle arg (index 1) with CPS
+  std::tuple<int, int, int> input{1, 10, 100};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+        return out(std::get<0>(before), arg * 2, std::get<0>(after));
+      }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(1, 20, 100));
+}
+
+TEST(SplTest, TransformArgCompleteCpsFirstArg) {
+  // Transform first arg (index 0), before tuple is empty
+  std::tuple<int, int> input{5, 10};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(before)>> == 0);
+        return out(arg * 10, std::get<0>(after));
+      }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(50, 10));
+}
+
+TEST(SplTest, TransformArgCompleteCpsLastArg) {
+  // Transform last arg (index 1), after tuple is empty
+  std::tuple<int, int> input{5, 10};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete_cps<1>([](auto&& out, auto&& before, int arg, auto&& after) {
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(after)>> == 0);
+        return out(std::get<0>(before), arg * 10);
+      }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(5, 100));
+}
+
+TEST(SplTest, TransformArgCompleteCpsSingleArg) {
+  // Single arg tuple
+  std::tuple<int> input{42};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(before)>> == 0);
+        static_assert(std::tuple_size_v<std::remove_cvref_t<decltype(after)>> == 0);
+        return out(arg * 2);
+      }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(84));
+}
+
+TEST(SplTest, TransformArgCompleteCpsExpandArg) {
+  // Expand first arg into two values
+  std::tuple<int, int> input{5, 10};
+
+  auto result = spl::apply(input,
+    spl::expand_tuple_complete(),
+      spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+        return out(arg, arg * 100, std::get<0>(after));
+      }),
+      spl::transform_complete([](auto&&... args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      }));
+
+  EXPECT_EQ(result, std::make_tuple(5, 500, 10));
+}
+
+TEST(SplTest, TransformArgCompleteConstexpr) {
+  constexpr auto result = []() {
+    std::tuple<int, int> input{3, 7};
+    return spl::apply(input,
+    spl::expand_tuple_complete(),
+        spl::transform_arg_complete<1>([](int x) { return x * 2; }),
+        spl::transform_complete([](int a, int b) {
+          return a + b;
+        }));
+  }();
+  static_assert(result == 17);  // 3 + (7*2) = 3 + 14 = 17
+  EXPECT_EQ(result, 17);
+}
+
+TEST(SplTest, TransformArgCompleteCpsConstexpr) {
+  constexpr auto result = []() {
+    std::tuple<int, int> input{3, 7};
+    return spl::apply(input,
+    spl::expand_tuple_complete(),
+        spl::transform_arg_complete_cps<0>([](auto&& out, auto&& before, int arg, auto&& after) {
+          return out(arg * 10, std::get<0>(after));
+        }),
+        spl::transform_complete([](int a, int b) {
+          return a + b;
+        }));
+  }();
+  static_assert(result == 37);  // (3*10) + 7 = 30 + 7 = 37
+  EXPECT_EQ(result, 37);
+}
+
+// ============================================================================
 // flatten_arg Tests
 // ============================================================================
 
