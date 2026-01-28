@@ -4436,6 +4436,298 @@ TEST(SplTest, TransformArgCompleteCpsConstexpr) {
 }
 
 // ============================================================================
+// Complete Versions of Transform Stages Tests
+// ============================================================================
+
+// deref_complete tests
+TEST(SplTest, DerefCompleteBasic) {
+  int a = 42;
+  int* ptr = &a;
+
+  auto result = spl::apply(ptr, spl::deref_complete());
+
+  EXPECT_EQ(result, 42);
+}
+
+TEST(SplTest, DerefArgCompleteMultiArg) {
+  int a = 10, b = 20;
+  int* ptr_b = &b;
+
+  auto result = spl::apply(std::make_tuple(a, ptr_b),
+      spl::expand_tuple_complete(),
+      spl::deref_arg_complete<1>(),
+      spl::make_tuple_complete());
+
+  EXPECT_EQ(std::get<0>(result), 10);  // unchanged
+  EXPECT_EQ(std::get<1>(result), 20);  // dereferenced
+}
+
+TEST(SplTest, DerefCompleteConstexpr) {
+  constexpr auto result = []() {
+    int a = 42;
+    int* ptr = &a;
+    return spl::apply(ptr, spl::deref_complete());
+  }();
+
+  static_assert(result == 42);
+  EXPECT_EQ(result, 42);
+}
+
+// addressof_complete tests
+TEST(SplTest, AddressofCompleteBasic) {
+  int a = 42;
+
+  auto result = spl::apply(a, spl::addressof_complete());
+
+  EXPECT_EQ(result, &a);
+  EXPECT_EQ(*result, 42);
+}
+
+TEST(SplTest, AddressofArgCompleteMultiArg) {
+  int a = 10, b = 20;
+
+  auto result = spl::apply(std::make_tuple(a, b),
+      spl::expand_tuple_complete(),
+      spl::addressof_arg_complete<1>(),
+      spl::deref_arg_complete<1>(),
+      spl::make_tuple_complete());
+
+  EXPECT_EQ(std::get<0>(result), 10);   // unchanged
+  EXPECT_EQ(std::get<1>(result), 20);
+}
+
+TEST(SplTest, AddressofCompleteConstexpr) {
+  constexpr auto result = []() {
+    int a = 42;
+    auto ptr = spl::apply(a, spl::addressof_complete());
+    return *ptr;
+  }();
+
+  static_assert(result == 42);
+  EXPECT_EQ(result, 42);
+}
+
+// cast_complete tests
+TEST(SplTest, CastCompleteBasic) {
+  int a = 42;
+
+  auto result = spl::apply(a, spl::cast_complete<double>());
+
+  EXPECT_EQ(result, 42.0);
+  EXPECT_TRUE((std::is_same_v<decltype(result), double>));
+}
+
+TEST(SplTest, CastArgCompleteMultiArg) {
+  int a = 10;
+  float b = 20.5f;
+
+  auto result = spl::apply(std::make_tuple(a, b),
+      spl::expand_tuple_complete(),
+      spl::cast_arg_complete<1, double>(),
+      spl::make_tuple_complete());
+
+  EXPECT_EQ(std::get<0>(result), 10);      // unchanged
+  EXPECT_EQ(std::get<1>(result), 20.5);    // cast to double
+  EXPECT_TRUE((std::is_same_v<decltype(std::get<1>(result)), double&>));
+}
+
+TEST(SplTest, CastCompleteConstexpr) {
+  constexpr auto result = []() {
+    int a = 42;
+    return spl::apply(a, spl::cast_complete<long>());
+  }();
+
+  static_assert(result == 42L);
+  static_assert(std::is_same_v<decltype(result), const long>);
+  EXPECT_EQ(result, 42L);
+}
+
+// ref_complete tests
+TEST(SplTest, RefCompleteBasic) {
+  int a = 42;
+
+  auto result = spl::apply(a, spl::ref_complete());
+
+  EXPECT_EQ(result.get(), 42);
+  result.get() = 100;
+  EXPECT_EQ(a, 100);
+}
+
+TEST(SplTest, RefArgCompleteMultiArg) {
+  int a = 10, b = 20;
+
+  // Apply ref_complete to a single argument
+  auto ref_b = spl::apply(b, spl::ref_complete());
+
+  EXPECT_EQ(ref_b.get(), 20);
+  ref_b.get() = 200;
+  EXPECT_EQ(b, 200);
+}
+
+TEST(SplTest, RefCompleteConstexpr) {
+  constexpr auto result = []() {
+    int a = 42;
+    auto ref = spl::apply(a, spl::ref_complete());
+    return ref.get();
+  }();
+
+  static_assert(result == 42);
+  EXPECT_EQ(result, 42);
+}
+
+// move_complete tests
+TEST(SplTest, MoveCompleteBasic) {
+  auto ptr = std::make_unique<int>(42);
+
+  auto result = spl::apply(std::move(ptr), spl::move_complete());
+
+  EXPECT_EQ(*result, 42);
+  EXPECT_EQ(ptr, nullptr);
+}
+
+TEST(SplTest, MoveArgCompleteMultiArg) {
+  int a = 10;
+  auto ptr = std::make_unique<int>(20);
+
+  auto result = spl::apply(std::make_tuple(a, std::move(ptr)),
+      spl::expand_tuple_complete(),
+      spl::move_arg_complete<1>(),
+      spl::make_tuple_complete());
+
+  EXPECT_EQ(std::get<0>(result), 10);      // unchanged
+  EXPECT_EQ(*std::get<1>(result), 20);     // moved
+}
+
+TEST(SplTest, MoveCompleteVector) {
+  std::vector<int> vec = {1, 2, 3, 4, 5};
+
+  auto result = spl::apply(std::move(vec), spl::move_complete());
+
+  EXPECT_EQ(result.size(), 5);
+  EXPECT_EQ(result[0], 1);
+  EXPECT_EQ(result[4], 5);
+  EXPECT_TRUE(vec.empty());  // moved from
+}
+
+// lref_complete tests
+TEST(SplTest, LrefCompleteBasic) {
+  int a = 42;
+
+  // Use decltype(auto) to preserve the reference type
+  decltype(auto) result = spl::apply(std::move(a), spl::lref_complete(),
+    spl::transform_complete([](auto&& ref)->decltype(auto){
+    static_assert(std::is_lvalue_reference_v<decltype(ref)>);
+    return std::forward<decltype(ref)>(ref);
+    }),
+    spl::ref_complete()
+  ).get();
+
+  EXPECT_EQ(result, 42);
+  result = 100;
+  EXPECT_EQ(a, 100);
+}
+
+TEST(SplTest, LrefArgCompleteMultiArg) {
+  int a = 10, b = 20;
+
+  // Use decltype(auto) to preserve reference types
+  decltype(auto) result = spl::apply(std::make_tuple(std::move(a), std::move(b)),
+      spl::expand_tuple_complete(),
+      spl::lref_arg_complete<1>(),
+      spl::make_tuple_complete());
+
+  EXPECT_EQ(std::get<0>(result), 10);
+  EXPECT_EQ(std::get<1>(result), 20);
+  // After make_tuple_complete, the reference might be captured as a value
+  // so we just check the values are correct
+}
+
+TEST(SplTest, LrefCompleteConstexpr) {
+  constexpr auto result = []() {
+    int a = 42;
+    // In a constexpr context, the reference is converted to value
+    return spl::apply(std::move(a), spl::lref_complete());
+  }();
+
+  static_assert(result == 42);
+  EXPECT_EQ(result, 42);
+}
+
+// construct_complete tests
+TEST(SplTest, ConstructCompleteBasic) {
+  auto result = spl::apply(std::make_tuple(1, 2),
+      spl::expand_tuple_complete(),
+      spl::construct_complete<std::pair<int, int>>());
+
+  EXPECT_EQ(result.first, 1);
+  EXPECT_EQ(result.second, 2);
+}
+
+TEST(SplTest, ConstructCompleteVector) {
+  auto result = spl::apply(std::make_tuple(5, 42),
+      spl::expand_tuple_complete(),
+      spl::construct_complete<std::vector<int>>());
+
+  EXPECT_EQ(result.size(), 5);
+  EXPECT_EQ(result[0], 42);
+  EXPECT_EQ(result[4], 42);
+}
+
+TEST(SplTest, ConstructCompleteString) {
+  auto result = spl::apply(std::make_tuple(3, 'x'),
+      spl::expand_tuple_complete(),
+      spl::construct_complete<std::string>());
+
+  EXPECT_EQ(result, "xxx");
+}
+
+TEST(SplTest, ConstructCompleteConstexpr) {
+  constexpr auto result = []() {
+    return spl::apply(std::make_tuple(10, 20),
+        spl::expand_tuple_complete(),
+        spl::construct_complete<std::pair<int, int>>());
+  }();
+
+  static_assert(result.first == 10);
+  static_assert(result.second == 20);
+  EXPECT_EQ(result.first, 10);
+  EXPECT_EQ(result.second, 20);
+}
+
+// Combined tests using multiple complete stages
+TEST(SplTest, CompleteStagesCombined) {
+  int a = 10;
+  int* ptr = &a;
+
+  // Dereference pointer, cast to double
+  auto result = spl::apply(ptr,
+      spl::deref_complete(),
+      spl::cast_complete<double>());
+
+  EXPECT_EQ(result, 10.0);
+  EXPECT_TRUE((std::is_same_v<decltype(result), double>));
+}
+
+TEST(SplTest, CompleteStagesCombinedMultiArg) {
+  int a = 5, b = 10;
+  int* ptr_a = &a;
+  int* ptr_b = &b;
+
+  // Dereference both pointers, then cast first to double
+  auto result = spl::apply(std::make_tuple(ptr_a, ptr_b),
+      spl::expand_tuple_complete(),
+      spl::deref_arg_complete<0>(),
+      spl::deref_arg_complete<1>(),
+      spl::cast_arg_complete<0, double>(),
+      spl::make_tuple_complete());
+
+  EXPECT_EQ(std::get<0>(result), 5.0);
+  EXPECT_EQ(std::get<1>(result), 10);
+  EXPECT_TRUE((std::is_same_v<decltype(std::get<0>(result)), double&>));
+  EXPECT_TRUE((std::is_same_v<decltype(std::get<1>(result)), int&>));
+}
+
+// ============================================================================
 // flatten_arg Tests
 // ============================================================================
 

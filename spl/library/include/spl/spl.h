@@ -757,6 +757,44 @@ constexpr auto transform_arg_cps_complete(F f);
 template<size_t I, typename F>
 constexpr auto transform_arg(F f);
 
+template<size_t I, typename F>
+constexpr auto transform_arg_complete(F f);
+
+// Complete versions of transform stages
+template<size_t I>
+constexpr auto deref_arg_complete();
+
+inline constexpr auto deref_complete();
+
+template<size_t I>
+constexpr auto addressof_arg_complete();
+
+inline constexpr auto addressof_complete();
+
+template<size_t I, typename T>
+constexpr auto cast_arg_complete();
+
+template<typename T>
+constexpr auto cast_complete();
+
+template<size_t I>
+constexpr auto ref_arg_complete();
+
+inline constexpr auto ref_complete();
+
+template<size_t I>
+constexpr auto move_arg_complete();
+
+inline constexpr auto move_complete();
+
+template<size_t I>
+constexpr auto lref_arg_complete();
+
+inline constexpr auto lref_complete();
+
+template<typename T>
+constexpr auto construct_complete();
+
 // Enumerate (prepend index to each element)
 inline constexpr auto enumerate(size_t start = 0);
 
@@ -1695,6 +1733,87 @@ constexpr auto transform_arg_complete(F f) {
                    std::forward<decltype(after_args)>(after_args)...);
       }, std::forward<decltype(after)>(after));
     }, std::forward<decltype(before)>(before));
+  });
+}
+
+// ref_complete
+template<size_t I>
+constexpr auto ref_arg_complete() {
+  return transform_arg_complete<I>([](auto&& arg) {
+    return std::ref(arg);
+  });
+}
+
+inline constexpr auto ref_complete() {
+  return ref_arg_complete<0>();
+}
+
+// move_complete
+template<size_t I>
+constexpr auto move_arg_complete() {
+  return transform_arg_complete<I>([](auto&& arg) -> decltype(auto) {
+    return std::move(arg);
+  });
+}
+
+inline constexpr auto move_complete() {
+  return move_arg_complete<0>();
+}
+
+// lref_complete
+template<size_t I>
+constexpr auto lref_arg_complete() {
+  return transform_arg_complete<I>([](auto&& arg) -> decltype(auto) {
+    return static_cast<std::remove_reference_t<decltype(arg)>&>(arg);
+  });
+}
+
+inline constexpr auto lref_complete() {
+  return lref_arg_complete<0>();
+}
+
+// deref_complete
+template<size_t I>
+constexpr auto deref_arg_complete() {
+  return transform_arg_complete<I>([](auto&& arg) -> decltype(auto) {
+    return *std::forward<decltype(arg)>(arg);
+  });
+}
+
+inline constexpr auto deref_complete() {
+  return deref_arg_complete<0>();
+}
+
+// addressof_complete
+template<size_t I>
+constexpr auto addressof_arg_complete() {
+  return transform_arg_complete<I>([](auto&& arg) {
+    return std::addressof(arg);
+  });
+}
+
+inline constexpr auto addressof_complete() {
+  return addressof_arg_complete<0>();
+}
+
+// cast_complete
+template<size_t I, typename T>
+constexpr auto cast_arg_complete() {
+  return transform_arg_complete<I>([](auto&& arg) -> T {
+    return static_cast<T>(std::forward<decltype(arg)>(arg));
+  });
+}
+
+template<typename T>
+constexpr auto cast_complete() {
+  return cast_arg_complete<0, T>();
+}
+
+// construct_complete (special case - no _arg version)
+template<typename T>
+constexpr auto construct_complete() {
+  return transform_cps_complete([](auto&& out, auto&&... inputs) {
+    return out(T(std::forward<decltype(inputs)>(inputs)...));
   });
 }
 
