@@ -1554,33 +1554,30 @@ constexpr auto transform(F f) {
 
 template<size_t I, typename F>
 constexpr auto transform_arg_cps(F f) {
-  return flat_map_arg<I>([f = std::move(f)](auto&& out, auto&& before, auto&& arg, auto&& after) {
-    auto invoke = [&] {
+  return transform_cps([f = std::move(f)](auto&& out, auto&&... inputs) {
+    auto tuple = std::forward_as_tuple(std::forward<decltype(inputs)>(inputs)...);
+
+    auto invoke = [&]<size_t... Before, size_t... After>(std::index_sequence<Before...>, std::index_sequence<After...>) {
       return std::invoke(f,
                          std::forward<decltype(out)>(out),
-                         std::forward<decltype(before)>(before),
-                         std::forward<decltype(arg)>(arg),
-                         std::forward<decltype(after)>(after));
+                         std::forward_as_tuple(std::get<Before>(std::move(tuple))...),
+                         std::get<I>(std::move(tuple)),
+                         std::forward_as_tuple(std::get<I + 1 + After>(std::move(tuple))...));
     };
-    if constexpr (impl::calculate_type_v<decltype(out)>) {
-      return invoke();
-    } else {
-      invoke();
-      return true;
-    }
+    return invoke(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(inputs) - I - 1>{});
   });
 }
 
 template<size_t I, typename F>
 constexpr auto transform_arg(F f) {
-  return transform_arg_cps<I>([f = std::move(f)](auto&& out, auto&& before, auto&& arg, auto&& after) {
-    return std::apply([&](auto&&... before_args) {
-      return std::apply([&](auto&&... after_args) {
-        return out(std::forward<decltype(before_args)>(before_args)...,
-                   std::invoke(f, std::forward<decltype(arg)>(arg)),
-                   std::forward<decltype(after_args)>(after_args)...);
-      }, std::forward<decltype(after)>(after));
-    }, std::forward<decltype(before)>(before));
+  return transform_cps([f = std::move(f)](auto&& out, auto&&... inputs) {
+    auto tuple = std::forward_as_tuple(std::forward<decltype(inputs)>(inputs)...);
+
+    return [&]<size_t... Before, size_t... After>(std::index_sequence<Before...>, std::index_sequence<After...>) {
+      return out(std::get<Before>(std::move(tuple))...,
+                 std::invoke(f, std::get<I>(std::move(tuple))),
+                 std::get<I + 1 + After>(std::move(tuple))...);
+    }(std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(inputs) - I - 1>{});
   });
 }
 
