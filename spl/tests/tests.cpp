@@ -1752,6 +1752,17 @@ TEST(SplTest, ZipDotProductConstexpr) {
   EXPECT_EQ(constexpr_zip_product_test(), 20);
 }
 
+TEST(SplTest, ZipWithGenerator) {
+  std::array<int, 5> v{10, 20, 30, 40, 50};
+
+  auto result = spl::apply(v,
+                          spl::zip(spl::iota(0)),
+                          spl::transform([](int val, int idx) { return val + idx; }),
+                          spl::to_vector());
+
+  EXPECT_THAT(result, ElementsAre(10, 21, 32, 43, 54));  // 10+0, 20+1, 30+2, 40+3, 50+4
+}
+
 // chain_before and chain_after tests
 TEST(SplTest, ChainBeforeBasic) {
   std::array<int, 3> v1{1, 2, 3};

@@ -2353,6 +2353,12 @@ constexpr auto SkydownSplMakeGenerator(
   });
 }
 
+template<typename F>
+constexpr auto&& SkydownSplMakeGenerator(generator<F>&& g){
+  return std::move(g);
+}
+ 
+
 template<typename Output, typename F>
 constexpr auto SkydownSplOutput(Output &&output,
                                 generator<F>&& g){
