@@ -1504,19 +1504,29 @@ auto read_lines() {
 ---
 # SPLIT_STRING
 
+`flatten()` the line into chars, `chunk_by` runs of same-class
+(space/non-space), accumulate each run as a no-copy `string_view`,
+and drop the whitespace runs.
+
 ```cpp
 auto split_string() {
   return spl::compose(
-    spl::transform(
-      [](std::string_view s) {
-        return absl::StrSplit(
-          s,
-          absl::ByAsciiWhitespace(),
-          absl::SkipEmpty()
-        );
-      }),
-    spl::flatten()
-  );
+    spl::flatten(),
+    spl::chunk_by(
+      [](char prev, const char& c) {
+        return std::isspace((unsigned char)prev) ==
+               std::isspace((unsigned char)c);
+      },
+      spl::accumulate(std::string_view{},
+        [](std::string_view s, const char& c) {
+          if (s.empty()) return std::string_view(&c, 1);
+          assert(&c == &s.back() + 1);  // chars stay contiguous
+          return std::string_view(s.data(), s.size() + 1);
+        })),
+    spl::filter([](std::string_view s) {
+      return !s.empty() &&
+             !std::isspace((unsigned char)s.front());
+    }));
 }
 ```
 
@@ -1529,8 +1539,9 @@ auto lower_case_string() {
     return spl::apply(
       s,
       spl::transform([](char c) {
-        return std::tolower(c); }),
-      spl::to_vector()  // assemble into std::string-like
+        return (char)std::tolower((unsigned char)c);
+      }),
+      spl::push_back_to<std::basic_string>()
     );
   });
 }

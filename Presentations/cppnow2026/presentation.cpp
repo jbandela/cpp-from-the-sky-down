@@ -456,10 +456,11 @@ auto unique_counts() {
 }
 
 void WordCountsPipeline(std::ostream& os) {
+  // Mixed case to exercise lower_case_string: counts must stay the same.
   std::istringstream input(
-      "the quick brown fox jumps over the lazy dog\n"
-      "the fox was quick and the dog was lazy\n"
-      "but the brown fox kept on jumping\n");
+      "The quick brown FOX jumps over the lazy dog\n"
+      "The Fox was QUICK and the dog was Lazy\n"
+      "but THE brown fox kept on JUMPING\n");
 
   constexpr size_t k = 5;
   spl::apply(input, read_lines(), split_string(), lower_case_string(),
