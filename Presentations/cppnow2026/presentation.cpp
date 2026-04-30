@@ -323,6 +323,25 @@ void GroupByDemo(std::ostream& os) {
              }));
 }
 
+// Run-length encoding: chunk_by adjacency, then for each run tee captures
+// the first element and the count in parallel and packs them into a pair.
+// (first() returns optional<char>; the chunk is non-empty by construction
+// so deref is always safe.)
+void RunLengthEncodingDemo(std::ostream& os) {
+  std::string input = "aaabbcdddde";
+  spl::apply(input,
+             spl::chunk_by(std::equal_to<>{},
+                           spl::tee(spl::first(), spl::count()),
+                           spl::transform_complete(
+                               [](std::optional<char> ch, size_t n) {
+                                 return std::make_pair(*ch, n);
+                               })),
+             spl::expand_tuple(),
+             spl::for_each([&](char c, size_t n) {
+               os << "  " << n << "x" << c << "\n";
+             }));
+}
+
 // ---------------------------------------------------------------------------
 // Section: REFERENCE INPUTS
 // Slides: Const reference / std::move
@@ -635,6 +654,14 @@ int main() {
   expect("group_by org -> count of fulltime employees", &GroupByDemo, R"(
   eng: 2
   sales: 2
+)");
+
+  expect("run-length encoding", &RunLengthEncodingDemo, R"(
+  3xa
+  2xb
+  1xc
+  4xd
+  1xe
 )");
 
   expect("reference inputs (compile-time static_asserts)", &ReferenceInputs, R"(

@@ -6,6 +6,13 @@ background-repeat: no-repeat
 
 ---
 class: center, middle
+
+# SPL on GitHub
+
+## https://github.com/jbandela/cpp-from-the-sky-down/tree/master/spl
+
+---
+class: center, middle
 # HISTORY
 
 ---
@@ -1371,6 +1378,28 @@ auto counts = spl::apply(
 ```
 
 ---
+# Run-length encoding
+
+`chunk_by` adjacent equals; the inner pipeline `tee`s the chunk's first
+element and its length, then packs them into a `pair<char, size_t>`.
+
+```cpp
+std::string input = "aaabbcdddde";
+spl::apply(input,
+  spl::chunk_by(std::equal_to<>{},
+    spl::tee(spl::first(), spl::count()),
+    spl::transform_complete(
+      [](std::optional<char> ch, size_t n) {
+        return std::make_pair(*ch, n);
+      })),
+  spl::expand_tuple(),
+  spl::for_each([](char c, size_t n) {
+    std::cout << n << "x" << c << "\n";
+  }));
+// 3xa 2xb 1xc 4xd 1xe
+```
+
+---
 class: center, middle
 # REFERENCE INPUTS
 
@@ -1582,4 +1611,7 @@ spl::apply(
 
 ---
 class: center, middle
+
 # QUESTIONS
+
+## https://github.com/jbandela/cpp-from-the-sky-down/tree/master/spl
