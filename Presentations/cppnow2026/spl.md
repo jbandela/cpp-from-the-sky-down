@@ -1,7 +1,8 @@
-class: center, middle
-
-# SPL: Compose Algorithms, Not Iterators
-## A C++23 push-based pipeline library
+class: title-slide
+background-image: url(spl_title_card.png)
+background-size: contain
+background-position: center
+background-repeat: no-repeat
 
 ---
 class: center, middle
