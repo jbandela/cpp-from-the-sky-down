@@ -9,7 +9,7 @@ class: center, middle
 
 # SPL on GitHub
 
-## https://github.com/jbandela/cpp-from-the-sky-down/tree/master/spl
+## https://github.com/jbandela/cpp-from-the-sky-down/tree/main/spl
 
 ---
 class: center, middle
@@ -1614,4 +1614,4 @@ class: center, middle
 
 # QUESTIONS
 
-## https://github.com/jbandela/cpp-from-the-sky-down/tree/master/spl
+## https://github.com/jbandela/cpp-from-the-sky-down/tree/main/spl
