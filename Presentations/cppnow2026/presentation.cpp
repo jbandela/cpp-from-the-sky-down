@@ -1,10 +1,13 @@
-// Runnable examples extracted from the SPL slide deck.
-// See spl.md for the corresponding slides.
+// Runnable, self-checking examples extracted from the SPL slide deck.
+// Each example writes to an std::ostream& and is checked against an expected
+// raw-string transcript in main(). See spl.md for the corresponding slides.
 
 #include <spl/spl.h>
 
 #include <array>
+#include <cassert>
 #include <cctype>
+#include <format>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -12,6 +15,7 @@
 #include <optional>
 #include <ranges>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -22,15 +26,14 @@
 // Section: STD::RANGES (the std::views motivating example)
 // Slide: STD::RANGES
 // ---------------------------------------------------------------------------
-void RangesIntroExample() {
-  std::cout << "\n=== std::ranges intro ===\n";
+void RangesIntroExample(std::ostream& os) {
   auto const ints = {0, 1, 2, 3, 4, 5};
   auto even = [](int i) { return 0 == i % 2; };
   auto square = [](int i) { return i * i; };
 
   for (int i : ints | std::views::filter(even) | std::views::transform(square))
-    std::cout << i << ' ';
-  std::cout << '\n';
+    os << i << ' ';
+  os << '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -39,10 +42,9 @@ void RangesIntroExample() {
 // Demonstrates the duplicate evaluation seen with std::views::transform
 // followed by std::views::filter.
 // ---------------------------------------------------------------------------
-void TpoiasiRanges() {
-  std::cout << "\n=== TPOIASI (std::ranges, with logging) ===\n";
-  auto times2 = [](int n) {
-    std::cout << "  transforming " << n << "\n";
+void TpoiasiRanges(std::ostream& os) {
+  auto times2 = [&](int n) {
+    os << "  transforming " << n << "\n";
     return n * 2;
   };
   auto isMultipleOf4 = [](int n) { return n % 4 == 0; };
@@ -50,15 +52,14 @@ void TpoiasiRanges() {
   std::vector<int> numbers = {1, 2, 3, 4, 5};
   auto results = numbers | std::views::transform(times2)
                          | std::views::filter(isMultipleOf4);
-  for (auto result : results) std::cout << "  -> " << result << '\n';
+  for (auto result : results) os << "  -> " << result << '\n';
 }
 
 // ---------------------------------------------------------------------------
 // Section: SPL — CRASH EXAMPLE
 // Slide: CRASH EXAMPLE (SPL)
 // ---------------------------------------------------------------------------
-void CrashExampleSpl() {
-  std::cout << "\n=== Crash example (SPL — runs safely) ===\n";
+void CrashExampleSpl(std::ostream& os) {
   using IntAndString = std::pair<int, std::string>;
   auto make_int_and_string = [](size_t i) -> IntAndString {
     return {static_cast<int>(i * i * i), std::to_string(i)};
@@ -72,32 +73,30 @@ void CrashExampleSpl() {
              }),
              spl::transform(&IntAndString::second),
              spl::take(4),
-             spl::for_each([](const auto& s) { std::cout << "  " << s << "\n"; }));
+             spl::for_each([&](const auto& s) { os << "  " << s << "\n"; }));
 }
 
 // ---------------------------------------------------------------------------
 // Section: SPL — TPOIASI
 // Slide: TPOIASI (SPL) / OUTPUT
 // ---------------------------------------------------------------------------
-void TpoiasiSpl() {
-  std::cout << "\n=== TPOIASI (SPL — single evaluation) ===\n";
-  auto times2 = [](int n) {
-    std::cout << "  transforming: " << n << "\n";
+void TpoiasiSpl(std::ostream& os) {
+  auto times2 = [&](int n) {
+    os << "  transforming: " << n << "\n";
     return n * 2;
   };
   auto isMultipleOf4 = [](int n) { return n % 4 == 0; };
 
   std::vector<int> numbers = {1, 2, 3, 4, 5};
   spl::apply(numbers, spl::transform(times2), spl::filter(isMultipleOf4),
-             spl::for_each([](auto result) { std::cout << "  -> " << result << '\n'; }));
+             spl::for_each([&](auto result) { os << "  -> " << result << '\n'; }));
 }
 
 // ---------------------------------------------------------------------------
 // Section: BENCHMARKS — handwritten / std::ranges / SPL filter chain
 // Slides: HANDWRITTEN LOOP / STD::RANGES / SPL
 // ---------------------------------------------------------------------------
-void FilterChainHandwritten() {
-  std::cout << "\n=== Filter chain (handwritten loop) ===\n";
+void FilterChainHandwritten(std::ostream& os) {
   std::vector<int> v;
   for (int i = 1; i <= 30; ++i) v.push_back(i);
 
@@ -107,12 +106,11 @@ void FilterChainHandwritten() {
       result.push_back(i);
     }
   }
-  for (int x : result) std::cout << x << ' ';
-  std::cout << '\n';
+  for (int x : result) os << x << ' ';
+  os << '\n';
 }
 
-void FilterChainSpl() {
-  std::cout << "\n=== Filter chain (SPL) ===\n";
+void FilterChainSpl(std::ostream& os) {
   std::vector<int> v;
   for (int i = 1; i <= 30; ++i) v.push_back(i);
 
@@ -125,8 +123,8 @@ void FilterChainSpl() {
                  spl::filter(not_divisible_by(5)),
                  spl::filter(not_divisible_by(7)),
                  spl::filter(not_divisible_by(11)), spl::to_vector());
-  for (int x : result) std::cout << x << ' ';
-  std::cout << '\n';
+  for (int x : result) os << x << ' ';
+  os << '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -146,11 +144,10 @@ auto PythagoreanTriples() {
       spl::swizzle<1, 2, 0>());
 }
 
-void PythagoreanTriplesReusable() {
-  std::cout << "\n=== Pythagorean triples (reusable, first 10) ===\n";
+void PythagoreanTriplesReusable(std::ostream& os) {
   spl::apply(PythagoreanTriples(), spl::take(10),
-             spl::for_each([](size_t a, size_t b, size_t c) {
-               std::cout << "  " << a << " " << b << " " << c << "\n";
+             spl::for_each([&](size_t a, size_t b, size_t c) {
+               os << "  " << a << " " << b << " " << c << "\n";
              }));
 }
 
@@ -163,12 +160,11 @@ auto perfect_squares() {
                       spl::transform([](size_t i) { return i * i; }));
 }
 
-void ComposeGenerators() {
-  std::cout << "\n=== compose generators (perfect squares >= 100) ===\n";
+void ComposeGenerators(std::ostream& os) {
   auto v = spl::apply(perfect_squares(),
                       spl::filter([](size_t i) { return i >= 100; }),
                       spl::take(5), spl::to_vector());
-  for (auto x : v) std::cout << "  " << x << "\n";
+  for (auto x : v) os << "  " << x << "\n";
 }
 
 // The deck shows compose(std::cref(amounts), filter(...)). std::reference_wrapper
@@ -179,44 +175,40 @@ auto credits_pipeline(std::vector<double> amounts) {
                       spl::filter([](double d) { return d > 0; }));
 }
 
-void ComposeRanges() {
-  std::cout << "\n=== compose ranges (credits only) ===\n";
+void ComposeRanges(std::ostream& os) {
   auto v = spl::apply(credits_pipeline({-10.0, 5.5, -2.0, 3.0, 8.25}),
                       spl::to_vector());
-  for (auto x : v) std::cout << "  " << x << "\n";
+  for (auto x : v) os << std::format("  {:.2f}\n", x);
 }
 
 // ---------------------------------------------------------------------------
 // Section: GENERATORS / IOTA
 // Slides: IOTA / IOTA WITH END
 // ---------------------------------------------------------------------------
-void IotaDemo() {
-  std::cout << "\n=== iota demo ===\n";
+void IotaDemo(std::ostream& os) {
   auto v = spl::apply(spl::iota(1, 11), spl::to_vector());
-  for (auto x : v) std::cout << x << ' ';
-  std::cout << '\n';
+  for (auto x : v) os << x << ' ';
+  os << '\n';
 }
 
 // ---------------------------------------------------------------------------
 // Section: MULTI-ARGUMENT STREAMS
 // Slides: Multi-argument streams / First class support / transform_arg
 // ---------------------------------------------------------------------------
-void MultiArgStreams() {
-  std::cout << "\n=== multi-argument streams: expand_tuple + flatten ===\n";
+void MultiArgStreams(std::ostream& os) {
   std::map<int, std::vector<int>> values{{1, {10, 20}}, {2, {30}}, {3, {40, 50, 60}}};
   spl::apply(values, spl::expand_tuple(), spl::flatten(),
-             spl::for_each([](int k, int v) {
-               std::cout << "  k=" << k << " v=" << v << "\n";
+             spl::for_each([&](int k, int v) {
+               os << "  k=" << k << " v=" << v << "\n";
              }));
 }
 
-void SwapMapKeyValue() {
-  std::cout << "\n=== swap map key/value via swizzle ===\n";
+void SwapMapKeyValue(std::ostream& os) {
   std::map<std::string, int> name2id{{"alice", 1}, {"bob", 2}, {"carol", 3}};
   auto id2name = spl::apply(std::move(name2id), spl::expand_tuple(),
                             spl::swizzle<1, 0>(), spl::to_map<std::map>());
   for (const auto& [k, v] : id2name)
-    std::cout << "  " << k << " -> " << v << "\n";
+    os << "  " << k << " -> " << v << "\n";
 }
 
 struct Person {
@@ -224,15 +216,14 @@ struct Person {
   int id;
 };
 
-void TransformArgDemo() {
-  std::cout << "\n=== transform_arg ===\n";
+void TransformArgDemo(std::ostream& os) {
   std::map<std::string, Person> name2person{
       {"alice", {"alice", 100}}, {"bob", {"bob", 200}}, {"carol", {"carol", 300}}};
   auto id2name = spl::apply(std::move(name2person), spl::expand_tuple(),
                             spl::transform_arg<1>(&Person::id),
                             spl::swizzle<1, 0>(), spl::to_map<std::map>());
   for (const auto& [k, v] : id2name)
-    std::cout << "  " << k << " -> " << v << "\n";
+    os << "  " << k << " -> " << v << "\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -248,8 +239,7 @@ std::optional<int> ParseInt(std::string_view s) {
   return s.empty() ? std::nullopt : std::optional<int>{value};
 }
 
-void ShortCircuitOnError() {
-  std::cout << "\n=== short-circuit on error ===\n";
+void ShortCircuitOnError(std::ostream& os) {
   std::vector<std::optional<std::string>> good{
       {std::string("1")}, {std::string("2")}, {std::string("3")}};
   std::vector<std::optional<std::string>> bad{
@@ -266,32 +256,30 @@ void ShortCircuitOnError() {
                             }),
                             spl::unwrap_optional(), spl::sum());
 
-  std::cout << "  good -> " << (sum_good ? std::to_string(*sum_good) : "nullopt")
-            << "\n";
-  std::cout << "  bad  -> " << (sum_bad ? std::to_string(*sum_bad) : "nullopt")
-            << "\n";
+  os << "  good -> " << (sum_good ? std::to_string(*sum_good) : "nullopt")
+     << "\n";
+  os << "  bad  -> " << (sum_bad ? std::to_string(*sum_bad) : "nullopt")
+     << "\n";
 }
 
-void FlattenVsUnwrap() {
-  std::cout << "\n=== flatten_optional vs unwrap_optional ===\n";
+void FlattenVsUnwrap(std::ostream& os) {
   std::vector<std::optional<int>> v{1, std::nullopt, 3};
 
   auto kept = spl::apply(v, spl::flatten_optional(), spl::to_vector());
-  std::cout << "  flatten_optional kept: ";
-  for (int x : kept) std::cout << x << ' ';
-  std::cout << '\n';
+  os << "  flatten_optional kept: ";
+  for (int x : kept) os << x << ' ';
+  os << '\n';
 
   auto sum = spl::apply(v, spl::unwrap_optional(), spl::sum());
-  std::cout << "  unwrap_optional sum: "
-            << (sum ? std::to_string(*sum) : "nullopt") << '\n';
+  os << "  unwrap_optional sum: "
+     << (sum ? std::to_string(*sum) : "nullopt") << '\n';
 }
 
 // ---------------------------------------------------------------------------
 // Section: HIGHER-ORDER STAGES
 // Slides: tee / Computing an average / Group elements
 // ---------------------------------------------------------------------------
-void TeeSummary() {
-  std::cout << "\n=== tee: feed three sub-pipelines into transform_complete ===\n";
+void TeeSummary(std::ostream& os) {
   std::vector<int> values{4, 1, 7, 2, 9, 3};
   auto summary = spl::apply(
       values, spl::tee(spl::min(), spl::max(), spl::count()),
@@ -299,19 +287,19 @@ void TeeSummary() {
                                  size_t n) {
         return std::tuple{mn, mx, n};
       }));
-  std::cout << "  min=" << std::get<0>(summary).value_or(-1)
-            << " max=" << std::get<1>(summary).value_or(-1)
-            << " count=" << std::get<2>(summary) << '\n';
+  os << std::format("  min={} max={} count={}\n",
+                    std::get<0>(summary).value_or(-1),
+                    std::get<1>(summary).value_or(-1),
+                    std::get<2>(summary));
 }
 
-void TeeAverage() {
-  std::cout << "\n=== tee average ===\n";
+void TeeAverage(std::ostream& os) {
   double avg = spl::apply(
       std::vector{1, 2, 3, 4, 5}, spl::tee(spl::sum(), spl::count()),
       spl::transform_complete([](int sum, size_t count) {
         return static_cast<double>(sum) / static_cast<double>(count);
       }));
-  std::cout << "  avg = " << avg << '\n';
+  os << std::format("  avg = {:.4f}\n", avg);
 }
 
 struct Employee {
@@ -320,8 +308,7 @@ struct Employee {
   std::string org;
 };
 
-void GroupByDemo() {
-  std::cout << "\n=== group_by org -> count of fulltime employees ===\n";
+void GroupByDemo(std::ostream& os) {
   std::vector<Employee> employees{
       {1, true, "eng"}, {2, true, "eng"}, {3, false, "eng"},
       {4, true, "sales"}, {5, true, "sales"}, {6, false, "ops"},
@@ -331,8 +318,8 @@ void GroupByDemo() {
   // either a multi-arg for_each or pack the args with make_pair() first.
   spl::apply(employees, spl::filter(&Employee::is_fulltime),
              spl::group_by(&Employee::org, spl::count()),
-             spl::for_each([](const std::string& org, size_t n) {
-               std::cout << "  " << org << ": " << n << "\n";
+             spl::for_each([&](const std::string& org, size_t n) {
+               os << "  " << org << ": " << n << "\n";
              }));
 }
 
@@ -344,30 +331,29 @@ void GroupByDemo() {
 // `std::ref(values)` yields T& iteration. That isn't supported today —
 // std::reference_wrapper<vector> doesn't satisfy std::ranges::range. Omitted.
 // ---------------------------------------------------------------------------
-void ReferenceInputs() {
-  std::cout << "\n=== reference inputs (compile-time static_asserts) ===\n";
+void ReferenceInputs(std::ostream& os) {
   std::vector<std::unique_ptr<int>> values;
   values.push_back(std::make_unique<int>(1));
   values.push_back(std::make_unique<int>(2));
 
   // The deck claims "const reference iteration by default" but a non-const
   // lvalue input actually yields T&. Pass std::as_const to get T const&.
-  spl::apply(std::as_const(values), spl::for_each([](auto&& ptr) {
+  spl::apply(std::as_const(values), spl::for_each([&](auto&& ptr) {
                static_assert(
                    std::is_same_v<decltype(ptr), const std::unique_ptr<int>&>);
-               std::cout << "  const& -> " << *ptr << "\n";
+               os << "  const& -> " << *ptr << "\n";
              }));
 
-  spl::apply(values, spl::for_each([](auto&& ptr) {
+  spl::apply(values, spl::for_each([&](auto&& ptr) {
                static_assert(
                    std::is_same_v<decltype(ptr), std::unique_ptr<int>&>);
-               std::cout << "  &      -> " << *ptr << "\n";
+               os << "  &      -> " << *ptr << "\n";
              }));
 
-  spl::apply(std::move(values), spl::for_each([](auto&& ptr) {
+  spl::apply(std::move(values), spl::for_each([&](auto&& ptr) {
                static_assert(
                    std::is_same_v<decltype(ptr), std::unique_ptr<int>&&>);
-               std::cout << "  &&     -> " << *ptr << "\n";
+               os << "  &&     -> " << *ptr << "\n";
              }));
 }
 
@@ -375,20 +361,18 @@ void ReferenceInputs() {
 // Section: CONVENIENCES
 // Slides: Initializing std::vector with unique_ptr / Moving keys / constexpr
 // ---------------------------------------------------------------------------
-void InitializingVectorOfUniquePtr() {
-  std::cout << "\n=== initializing vector<unique_ptr<int>> via spl::apply ===\n";
+void InitializingVectorOfUniquePtr(std::ostream& os) {
   auto v = spl::apply(
       // Note: this initializer-list overload moves elements out of the list.
       std::array{std::make_unique<int>(0), std::make_unique<int>(1)},
       spl::to_vector());
-  for (auto& p : v) std::cout << "  " << *p << "\n";
+  for (auto& p : v) os << "  " << *p << "\n";
 }
 
-void MovingKeysOutOfMap() {
-  std::cout << "\n=== moving keys out of a set ===\n";
+void MovingKeysOutOfMap(std::ostream& os) {
   std::vector<std::string> seed{"alpha", "bravo", "charlie"};
   auto v = spl::apply(std::move(seed), spl::to_vector());
-  for (const auto& s : v) std::cout << "  " << s << "\n";
+  for (const auto& s : v) os << "  " << s << "\n";
 }
 
 // The deck shows `constexpr auto squares = spl::apply(..., spl::to_vector());`
@@ -398,9 +382,8 @@ void MovingKeysOutOfMap() {
 constexpr auto sum_of_squares_constexpr = spl::apply(
     spl::iota(1, 6), spl::transform([](size_t x) { return x * x; }), spl::sum());
 
-void ConstexprSquares() {
-  std::cout << "\n=== constexpr squares (sum) ===\n";
-  std::cout << "  sum 1..5 squared = " << sum_of_squares_constexpr << '\n';
+void ConstexprSquares(std::ostream& os) {
+  os << "  sum 1..5 squared = " << sum_of_squares_constexpr << '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +407,9 @@ auto read_lines() {
             return emit();
           } else {
             if (std::getline(is, line)) {
+              line.push_back('\n');  // restore separator getline stripped,
+                                     // so chunk_by sees a word boundary
+                                     // between lines
               emit();
               return true;
             }
@@ -435,30 +421,32 @@ auto read_lines() {
 
 auto split_string() {
   return spl::compose(
-      spl::transform([](std::string_view s) {
-        std::vector<std::string> tokens;
-        size_t i = 0;
-        while (i < s.size()) {
-          while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i])))
-            ++i;
-          size_t start = i;
-          while (i < s.size() && !std::isspace(static_cast<unsigned char>(s[i])))
-            ++i;
-          if (start < i) tokens.emplace_back(s.substr(start, i - start));
-        }
-        return tokens;
-      }),
-      spl::flatten());
+      spl::flatten(),
+      spl::chunk_by(
+          [](char prev, const char& c) {
+            return std::isspace(static_cast<unsigned char>(prev)) ==
+                   std::isspace(static_cast<unsigned char>(c));
+          },
+          spl::accumulate(std::string_view{},
+                          [](std::string_view s, const char& c) {
+                            if (s.empty()) {
+                              return std::string_view(&c, 1);
+                            } else {
+                              assert(&c == &s.back() + 1);
+                              return std::string_view(s.data(), s.size() + 1);
+                            }
+                          })),
+      spl::filter([](std::string_view s) {
+        return !s.empty() &&
+               !std::isspace(static_cast<unsigned char>(s.front()));
+      }));
 }
 
 auto lower_case_string() {
-  return spl::transform([](const std::string& s) {
-    std::string out;
-    out.reserve(s.size());
-    for (char c : s)
-      out.push_back(
-          static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    return out;
+  return spl::transform([](std::string_view s) {
+    return spl::apply(s, spl::transform([](char c) {
+       return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }), spl::push_back_to<std::basic_string>());
   });
 }
 
@@ -467,8 +455,7 @@ auto unique_counts() {
                       spl::swizzle<1, 0>(), spl::make_pair());
 }
 
-void WordCountsPipeline() {
-  std::cout << "\n=== word counts (top k) ===\n";
+void WordCountsPipeline(std::ostream& os) {
   std::istringstream input(
       "the quick brown fox jumps over the lazy dog\n"
       "the fox was quick and the dog was lazy\n"
@@ -479,46 +466,209 @@ void WordCountsPipeline() {
              unique_counts(), spl::to_vector(),
              spl::partial_sort(k, std::greater<>()), spl::take(k),
              spl::expand_tuple(),
-             spl::for_each([](size_t n, const std::string& s) {
-               std::cout << "  " << n << " " << s << "\n";
+             spl::for_each([&](size_t n, const std::string& s) {
+               os << "  " << n << " " << s << "\n";
              }));
 }
 
 // ---------------------------------------------------------------------------
+// Test harness: run an example, compare its output, throw on mismatch.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Strip trailing whitespace from each line and a leading newline so the raw
+// strings stay readable (start on the line after R"() and don't need to
+// reproduce trailing spaces emitted by simple `os << x << ' '` loops).
+std::string normalize(std::string_view s) {
+  if (!s.empty() && s.front() == '\n') s.remove_prefix(1);
+  std::string out;
+  out.reserve(s.size());
+  size_t line_start = 0;
+  for (size_t i = 0; i <= s.size(); ++i) {
+    if (i == s.size() || s[i] == '\n') {
+      size_t end = i;
+      while (end > line_start && (s[end - 1] == ' ' || s[end - 1] == '\t'))
+        --end;
+      out.append(s.data() + line_start, end - line_start);
+      if (i < s.size()) out.push_back('\n');
+      line_start = i + 1;
+    }
+  }
+  return out;
+}
+
+void expect(std::string_view name,
+            void (*fn)(std::ostream&),
+            std::string_view expected_raw) {
+  std::ostringstream captured;
+  fn(captured);
+  std::string actual = normalize(captured.str());
+  std::string expected = normalize(expected_raw);
+
+  std::cout << "=== " << name << " ===\n" << actual;
+
+  if (actual != expected) {
+    std::cerr << "\n*** MISMATCH in " << name << " ***\n"
+              << "--- expected ---\n" << expected
+              << "--- actual ---\n" << actual
+              << "----------------\n";
+    throw std::runtime_error(std::string("output mismatch: ") + std::string(name));
+  }
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
 int main() {
-  RangesIntroExample();
-  TpoiasiRanges();
+  expect("std::ranges intro", &RangesIntroExample, R"(
+0 4 16
+)");
 
-  CrashExampleSpl();
-  TpoiasiSpl();
+  expect("TPOIASI (std::ranges, with logging)", &TpoiasiRanges, R"(
+  transforming 1
+  transforming 2
+  transforming 2
+  -> 4
+  transforming 3
+  transforming 4
+  transforming 4
+  -> 8
+  transforming 5
+)");
 
-  FilterChainHandwritten();
-  FilterChainSpl();
+  expect("Crash example (SPL — runs safely)", &CrashExampleSpl, R"(
+  2
+  4
+  5
+  7
+)");
 
-  PythagoreanTriplesReusable();
+  expect("TPOIASI (SPL — single evaluation)", &TpoiasiSpl, R"(
+  transforming: 1
+  transforming: 2
+  -> 4
+  transforming: 3
+  transforming: 4
+  -> 8
+  transforming: 5
+)");
 
-  ComposeGenerators();
-  ComposeRanges();
-  IotaDemo();
+  expect("Filter chain (handwritten loop)", &FilterChainHandwritten, R"(
+1 13 17 19 23 29
+)");
 
-  MultiArgStreams();
-  SwapMapKeyValue();
-  TransformArgDemo();
+  expect("Filter chain (SPL)", &FilterChainSpl, R"(
+1 13 17 19 23 29
+)");
 
-  ShortCircuitOnError();
-  FlattenVsUnwrap();
+  expect("Pythagorean triples (reusable, first 10)", &PythagoreanTriplesReusable, R"(
+  3 4 5
+  6 8 10
+  5 12 13
+  9 12 15
+  8 15 17
+  12 16 20
+  7 24 25
+  15 20 25
+  10 24 26
+  20 21 29
+)");
 
-  TeeSummary();
-  TeeAverage();
-  GroupByDemo();
+  expect("compose generators (perfect squares >= 100)", &ComposeGenerators, R"(
+  100
+  121
+  144
+  169
+  196
+)");
 
-  ReferenceInputs();
+  expect("compose ranges (credits only)", &ComposeRanges, R"(
+  5.50
+  3.00
+  8.25
+)");
 
-  InitializingVectorOfUniquePtr();
-  MovingKeysOutOfMap();
-  ConstexprSquares();
+  expect("iota demo", &IotaDemo, R"(
+1 2 3 4 5 6 7 8 9 10
+)");
 
-  WordCountsPipeline();
+  expect("multi-argument streams: expand_tuple + flatten", &MultiArgStreams, R"(
+  k=1 v=10
+  k=1 v=20
+  k=2 v=30
+  k=3 v=40
+  k=3 v=50
+  k=3 v=60
+)");
 
+  expect("swap map key/value via swizzle", &SwapMapKeyValue, R"(
+  1 -> alice
+  2 -> bob
+  3 -> carol
+)");
+
+  expect("transform_arg", &TransformArgDemo, R"(
+  100 -> alice
+  200 -> bob
+  300 -> carol
+)");
+
+  expect("short-circuit on error", &ShortCircuitOnError, R"(
+  good -> 6
+  bad  -> nullopt
+)");
+
+  expect("flatten_optional vs unwrap_optional", &FlattenVsUnwrap, R"(
+  flatten_optional kept: 1 3
+  unwrap_optional sum: nullopt
+)");
+
+  expect("tee: feed three sub-pipelines into transform_complete", &TeeSummary, R"(
+  min=1 max=9 count=6
+)");
+
+  expect("tee average", &TeeAverage, R"(
+  avg = 3.0000
+)");
+
+  expect("group_by org -> count of fulltime employees", &GroupByDemo, R"(
+  eng: 2
+  sales: 2
+)");
+
+  expect("reference inputs (compile-time static_asserts)", &ReferenceInputs, R"(
+  const& -> 1
+  const& -> 2
+  &      -> 1
+  &      -> 2
+  &&     -> 1
+  &&     -> 2
+)");
+
+  expect("initializing vector<unique_ptr<int>> via spl::apply",
+         &InitializingVectorOfUniquePtr, R"(
+  0
+  1
+)");
+
+  expect("moving keys out of a set", &MovingKeysOutOfMap, R"(
+  alpha
+  bravo
+  charlie
+)");
+
+  expect("constexpr squares (sum)", &ConstexprSquares, R"(
+  sum 1..5 squared = 55
+)");
+
+  expect("word counts (top k)", &WordCountsPipeline, R"(
+  5 the
+  3 fox
+  2 was
+  2 quick
+  2 lazy
+)");
+
+  std::cout << "\nAll examples matched expected output.\n";
   return 0;
 }
