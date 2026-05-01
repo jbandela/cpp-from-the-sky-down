@@ -354,6 +354,17 @@ algorithm composition
 * `constexpr`-compatible: works at compile-time *or* runtime
 
 ---
+# NAMESPACES
+
+* **`spl::`** — general usage. The stages, `apply`, `compose`,
+  `generator`, etc. This is what 95% of users write.
+* **`spl::impl::`** — implementation utilities. Reach for these when
+  you're writing a stage, a custom generator, or an ADL hook
+  (`calculate_type_v`, `output`, `make_generator`).
+* **All other namespaces** (`spl::detail::`, `spl::impl::cpo::`, ...)
+  are internal. Don't depend on them.
+
+---
 # QUICK EXAMPLES
 
 We will have an example that we look at more in depth coming up. This
@@ -896,6 +907,34 @@ struct filter_impl<StageProperties,
 ```
 
 ---
+# A USER-DEFINED STAGE
+
+The struct goes in your namespace; a public factory wraps it via
+`spl::impl::make_stage<Impl, InputStyle, OutputStyle, Params...>`.
+
+```cpp
+namespace mine {
+template <typename SP, typename IT, typename F> struct doubled_impl;
+template <typename SP, typename... I, typename F>
+struct doubled_impl<SP, spl::impl::types<I...>, F>
+    : spl::impl::stage_impl<doubled_impl<SP, spl::impl::types<I...>, F>> {
+  using output_types = spl::impl::types<std::invoke_result_t<F&, I...>>;
+  F f;
+  constexpr void process_incremental(I... xs) {
+    this->next.process_incremental(f(xs...) * 2);
+  }
+};
+
+template <typename F>
+constexpr auto doubled(F f) {
+  return spl::impl::make_stage<doubled_impl,
+      spl::impl::processing_style::incremental,
+      spl::impl::processing_style::incremental, F>(std::move(f));
+}
+}  // namespace mine
+```
+
+---
 # STAGE_IMPL CRTP BASE
 
 ```cpp
@@ -1189,27 +1228,6 @@ spl::apply(std::vector<std::optional<int>>{{1}, std::nullopt, {3}},
   spl::unwrap_optional(),
   spl::sum());
 // std::nullopt — sum() never sees {3}
-```
-
----
-# Monadic style
-
-```cpp
-std::optional<int> ParseInt(std::string_view);
-int Squared(int i);
-std::optional<std::string> value = ...;
-
-// C++23
-std::optional<int> cpp23 = value
-  .and_then(&ParseInt)
-  .transform(&Squared);
-
-// SPL
-std::optional<int> result = spl::apply(
-  value,
-  spl::unwrap_optional(),
-  spl::transform_complete(&ParseInt),
-  spl::transform_complete(&Squared));
 ```
 
 ---

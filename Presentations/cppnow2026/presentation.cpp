@@ -275,6 +275,34 @@ void MakeGeneratorFallbackDemo(std::ostream& os) {
              spl::for_each([&](size_t i) { os << "  " << i << "\n"; }));
 }
 
+// User-defined stage built directly on spl::impl::stage_impl + make_stage.
+// Verifies the "A USER-DEFINED STAGE" slide.
+namespace user_stage_demo {
+template <typename SP, typename IT, typename F> struct doubled_impl;
+template <typename SP, typename... I, typename F>
+struct doubled_impl<SP, spl::impl::types<I...>, F>
+    : spl::impl::stage_impl<doubled_impl<SP, spl::impl::types<I...>, F>> {
+  using output_types = spl::impl::types<std::invoke_result_t<F&, I...>>;
+  F f;
+  constexpr void process_incremental(I... xs) {
+    this->next.process_incremental(f(xs...) * 2);
+  }
+};
+
+template <typename F>
+constexpr auto doubled(F f) {
+  return spl::impl::make_stage<doubled_impl,
+      spl::impl::processing_style::incremental,
+      spl::impl::processing_style::incremental, F>(std::move(f));
+}
+}  // namespace user_stage_demo
+
+void UserDefinedStageDemo(std::ostream& os) {
+  spl::apply(spl::iota(1, 6),
+             user_stage_demo::doubled([](size_t x) { return x + 10; }),
+             spl::for_each([&](size_t y) { os << "  " << y << "\n"; }));
+}
+
 // ---------------------------------------------------------------------------
 // Section: MULTI-ARGUMENT STREAMS
 // Slides: Multi-argument streams / First class support / transform_arg
@@ -714,6 +742,15 @@ int main() {
   1
   2
   3
+)");
+
+  expect("user-defined stage (stage_impl + make_stage)",
+         &UserDefinedStageDemo, R"(
+  22
+  24
+  26
+  28
+  30
 )");
 
   expect("multi-argument streams: expand_tuple + flatten", &MultiArgStreams, R"(
