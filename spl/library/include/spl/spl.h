@@ -194,7 +194,16 @@ constexpr decltype(auto) move_if_movable_range(T &&t) {
 
 } // namespace detail
 
-// ADL customization point for outputting ranges
+// Forward declaration so the early SkydownSpl* overloads (and the CPOs
+// below them) can name `generator`. The full definition is later in the
+// file alongside iota and friends.
+template<typename F> struct generator;
+
+namespace impl {
+
+// ADL customization point for outputting ranges. Lives in spl::impl so the
+// CPO below (also in spl::impl) finds it via enclosing-namespace lookup at
+// Phase-1 template-definition time.
 template<typename Output, typename R>
 constexpr auto SkydownSplOutput(Output &&output,
                                 R &&r)requires(std::ranges::range<std::remove_cvref_t<
@@ -202,21 +211,82 @@ constexpr auto SkydownSplOutput(Output &&output,
   if constexpr (spl::impl::calculate_type_v<Output>) {
     auto &&v = *r.begin();
     return output(
-        detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
+        spl::detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
             v)));
 
   } else {
     for (auto &&v : std::forward<R>(r)) {
       if (!output) return false;
       output(
-          detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
+          spl::detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
               v)));
     }
     return true;
   }
 }
 
-namespace impl {
+// Range and generator-passthrough MakeGenerator overloads — defined later
+// in the file (need the full `generator` definition). Forward-declared here
+// so the CPO below finds them at Phase-1 unqualified lookup.
+template<typename R>
+constexpr auto SkydownSplMakeGenerator(R &&r)
+    requires(std::ranges::range<std::remove_cvref_t<R>>);
+
+template<typename F>
+constexpr auto&& SkydownSplMakeGenerator(generator<F>&& g);
+
+// Niebloid customization-point objects (CPOs).
+//
+// `spl::impl::output(out, t)` and `spl::impl::make_generator(t)` dispatch
+// via ADL to the SkydownSplOutput / SkydownSplMakeGenerator free functions.
+// Defined here (after the range overload, before any internal call site)
+// so the CPO body's unqualified `SkydownSplOutput` finds the range overload
+// at Phase-1 template-definition time. Other overloads (generator<F>,
+// MakeGenerator, fallback) appear later in the file and are picked up via
+// ADL at instantiation on the args' associated namespaces.
+//
+// Lives in spl::impl alongside other advanced/implementation utilities like
+// calculate_type_v: not just internal, but not the recommended user-facing
+// surface either. Users normally write the SkydownSpl* free functions in
+// their own namespace and rely on ADL to find them.
+namespace cpo {
+// Dispatch order:
+//   1. SkydownSplOutput(out, t) if it exists.
+//   2. Otherwise, if SkydownSplMakeGenerator(t) exists, route through it
+//      and call SkydownSplOutput(out, generator).
+// The fallback used to be a SkydownSplOutput overload with a trailing
+// `...` to make it strictly worse than non-variadic candidates; folding
+// it into the CPO removes that trick entirely.
+struct output_fn {
+  template<typename O, typename T>
+  constexpr auto operator()(O&& o, T&& t) const
+    requires
+      requires { SkydownSplOutput(std::forward<O>(o), std::forward<T>(t)); } ||
+      requires { SkydownSplMakeGenerator(std::forward<T>(t)); }
+  {
+    if constexpr (requires {
+      SkydownSplOutput(std::forward<O>(o), std::forward<T>(t));
+    }) {
+      return SkydownSplOutput(std::forward<O>(o), std::forward<T>(t));
+    } else {
+      return SkydownSplOutput(
+          std::forward<O>(o),
+          SkydownSplMakeGenerator(std::forward<T>(t)));
+    }
+  }
+};
+
+struct make_generator_fn {
+  template<typename T>
+  constexpr auto operator()(T&& t) const
+      -> decltype(SkydownSplMakeGenerator(std::forward<T>(t))) {
+    return SkydownSplMakeGenerator(std::forward<T>(t));
+  }
+};
+}  // namespace cpo
+
+inline constexpr cpo::output_fn output{};
+inline constexpr cpo::make_generator_fn make_generator{};
 
 // Partial specialization extracting types<...> as second parameter
 template<template<typename...> typename Derived, typename StageProperties, typename... InputTypes, typename... Parameters>
@@ -375,13 +445,13 @@ struct values_impl<StageProperties, impl::types<InputType>>
     : impl::stage_impl<values_impl<StageProperties, impl::types<InputType>>> {
   using base = typename values_impl::base;
 
-using output_types =  decltype( SkydownSplOutput(impl::type_calculating_outputter(), std::declval<InputType>()));
+using output_types =  decltype( spl::impl::output(impl::type_calculating_outputter(), std::declval<InputType>()));
 
 static_assert(is_types<output_types>::value);
 
   constexpr decltype(auto) process_complete(InputType inputs) {
     std::invoke([](auto &&output, InputType input) {
-                  SkydownSplOutput(output, static_cast<InputType>(input));
+                  spl::impl::output(output, static_cast<InputType>(input));
 
                 },
                 impl::incremental_outputter{this->next},
@@ -1945,7 +2015,7 @@ constexpr auto flatten() {
   return flat_map([]<typename Out>(Out &&out, auto &&...inputs) {
     return detail::invoke_with_last_first(
         [&](auto &&last, auto &&... inputs) {
-          return SkydownSplOutput(impl::as_outputter(out,
+          return spl::impl::output(impl::as_outputter(out,
                                                [&](auto &&out, auto &&item) {
                                                  return out(std::forward<
                                                                 decltype(inputs)>(inputs)...,
@@ -1964,7 +2034,7 @@ constexpr auto flatten_arg() {
   return flat_map_arg<I>([](auto&& out, auto&& before, auto&& arg, auto&& after) {
     return std::apply([&](auto&&... before_args) {
       return std::apply([&](auto&&... after_args) {
-        return SkydownSplOutput(impl::as_outputter(out,
+        return spl::impl::output(impl::as_outputter(out,
             [&](auto&& out, auto&& item) {
               return out(forward_as_const<decltype(before_args)>(before_args)...,
                          std::forward<decltype(item)>(item),
@@ -2328,6 +2398,8 @@ struct generator:F {
 template<typename F>
 generator(F) -> generator<F>;
 
+// Defined in spl::impl to match the forward declarations near the CPOs.
+namespace impl {
 template<typename R>
 constexpr auto SkydownSplMakeGenerator(
     R &&r)requires(std::ranges::range<std::remove_cvref_t<
@@ -2336,7 +2408,7 @@ constexpr auto SkydownSplMakeGenerator(
     auto &&v = *begin;
     if constexpr (impl::calculate_type_v<decltype(out)>) {
       return out(std::forward<decltype(arg_stream)>(arg_stream)...,
-          detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
+          spl::detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
               v)));
 
     } else {
@@ -2344,7 +2416,7 @@ constexpr auto SkydownSplMakeGenerator(
         return false;
       }
       out(std::forward<decltype(arg_stream)>(arg_stream)...,
-          detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
+          spl::detail::move_if_movable_range<decltype(r)>(std::forward<decltype(v)>(
               v)));
       ++begin;
       return true;
@@ -2357,6 +2429,7 @@ template<typename F>
 constexpr auto&& SkydownSplMakeGenerator(generator<F>&& g){
   return std::move(g);
 }
+}  // namespace impl
  
 
 template<typename Output, typename F>
@@ -2370,10 +2443,9 @@ constexpr auto SkydownSplOutput(Output &&output,
   }
 }
 
-
 template<typename R>
 constexpr auto zip(R&& r){
-  return flat_map([g = SkydownSplMakeGenerator(std::forward<R>(r))](auto&& out, auto&&... args)mutable{
+  return flat_map([g = spl::impl::make_generator(std::forward<R>(r))](auto&& out, auto&&... args)mutable{
     return g(std::forward<decltype(out)>(out),std::forward<decltype(args)>(args)...);
   });
 }
@@ -2440,7 +2512,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
         first_call = false;
         // Output all items from the chained sequence before the first element
 
-        SkydownSplOutput(impl::incremental_outputter{this->next}, std::forward<R>(range));
+        spl::impl::output(impl::incremental_outputter{this->next}, std::forward<R>(range));
       }
     }
     // Output the current input
@@ -2450,7 +2522,7 @@ struct chain_impl<StageProperties, impl::types<InputTypes...>, R, std::integral_
   constexpr decltype(auto) finish() {
     if (first_call || Position == chain_position::after) {
       // Output all items from the chained sequence after all inputs
-      SkydownSplOutput(impl::incremental_outputter{this->next}, std::forward<R>(range));
+      spl::impl::output(impl::incremental_outputter{this->next}, std::forward<R>(range));
     }
     return this->next.finish();
   }

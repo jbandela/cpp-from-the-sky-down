@@ -1360,8 +1360,7 @@ constexpr auto calculate_generator() {
   auto t = spl::compose(
       spl::filter([](int i) { return i != 2; }),
       spl::sum());
-  using spl::SkydownSplMakeGenerator;
-  return spl::apply(SkydownSplMakeGenerator(v),
+  return spl::apply(spl::impl::make_generator(v),
                     spl::transform([](int i) { return i * 2; }),
                     std::move(t));
 
