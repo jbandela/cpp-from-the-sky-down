@@ -13,6 +13,11 @@ class: center, middle
 
 ---
 class: center, middle
+
+![WorldQuant](WorldQuantCorporateLogo.svg)
+
+---
+class: center, middle
 # HISTORY
 
 ---
@@ -244,46 +249,6 @@ transforming 5
 
 The filter iterator has an embedded loop.
 
----
-# STACK SIZE
-
-```cpp
-__attribute__((noinline)) void Main7() {
-  auto even = [](auto i) { return i % 2 == 0; };
-  std::vector<int> r0 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  auto result = r0 | std::views::filter(even)
-    | std::views::filter(even)
-    | std::views::filter(even)
-    | std::views::filter(even)
-    | std::views::filter(even)
-    | std::views::filter(even)
-    | std::views::filter(even);
-  PrintStack("Main7");
-}
-```
-
-https://godbolt.org/z/6zhGaf588
-
----
-# STACK SIZE OUTPUT
-
-```
-Main0 192 144 32 0
-Main1 192 192 32 0
-Main2 192 240 32 0
-Main3 192 320 32 0
-Main4 192 448 32 0
-Main5 192 608 32 0
-Main6 192 832 32 0
-Main7 192 1120 32 0
-```
-
----
-# CUBIC GROWTH
-
-`(144 + (N+1)(N+2)(N+3)/6 + 2N) * 8 bytes`
-
-h/t Richard Smith
 
 ---
 class: center, middle
@@ -466,98 +431,6 @@ transforming: 5
 * Transforms and filters are not repeatedly evaluated
 * Stateful function objects for `transform`
 * Stateful predicates for `filter`
-
----
-# STACK SIZE (SPL)
-
-```cpp
-__attribute__((noinline)) void SplMain7() {
-  auto even = [](auto i) { return i % 2 == 0; };
-  std::vector<int> r0 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  [[maybe_unused]] auto result = spl::apply(r0,
-    spl::filter(even),
-    spl::filter(even),
-    spl::filter(even),
-    spl::filter(even),
-    spl::filter(even),
-    spl::filter(even),
-    spl::filter(even),
-    spl::to_vector());
-  PrintStack("SplMain7");
-}
-```
-
----
-# STACK SIZE OUTPUT (SPL)
-
-```
-SplMain0  224 112 32 192 0
-SplMain1  224 112 32 192 0
-SplMain2  224 128 32 192 0
-SplMain3  224 128 32 192 0
-SplMain4  224 128 32 192 0
-SplMain5  224 144 32 192 0
-SplMain6  224 160 32 192 0
-SplMain7  224 176 32 192 0
-SplMain14 224 320 32 192 0
-```
-
----
-class: center, middle
-# BENCHMARKS
-
----
-# HANDWRITTEN LOOP
-
-```cpp
-std::vector<int> result;
-for (int i : v) {
-  if (i % 2 != 0 && i % 3 != 0 && i % 5 != 0
-      && i % 7 != 0 && i % 11 != 0) {
-    result.push_back(i);
-  }
-}
-```
-
----
-# STD::RANGES
-
-```cpp
-auto to_vector = [](auto&& r){
-  return std::vector<int>(r.begin(), r.end());
-};
-using std::ranges::views::filter;
-std::vector<int> result = to_vector(v
-  | filter(not_divisible_by_2)
-  | filter(not_divisible_by_3)
-  | filter(not_divisible_by_5)
-  | filter(not_divisible_by_7)
-  | filter(not_divisible_by_11));
-```
-
----
-# SPL
-
-```cpp
-std::vector<int> result = spl::apply(v,
-  spl::filter(not_divisible_by_2),
-  spl::filter(not_divisible_by_3),
-  spl::filter(not_divisible_by_5),
-  spl::filter(not_divisible_by_7),
-  spl::filter(not_divisible_by_11),
-  spl::to_vector()
-);
-```
-
----
-# OPTIMIZED
-
-<!-- Benchmark chart: optimized -->
-
----
-# UNOPTIMIZED
-
-<!-- Benchmark chart: unoptimized -->
 
 ---
 class: center, middle
