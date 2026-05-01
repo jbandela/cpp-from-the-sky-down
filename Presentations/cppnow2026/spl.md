@@ -1052,6 +1052,14 @@ template <typename F>
 generator(F) -> generator<F>;
 ```
 
+The pipeline calls your lambda twice with different `output`s:
+
+* **Type-deduction pass**: `spl::impl::calculate_type_v<decltype(output)>`
+  is `true`. Call `output(...)` once with a representative value and
+  return what it returns — don't run the real work.
+* **Run pass**: emit values via `output(...)`, return `true` to keep
+  going, `false` when exhausted.
+
 ---
 # IOTA
 
@@ -1066,13 +1074,20 @@ inline constexpr auto iota(size_t start) {
 
 ```cpp
 inline constexpr auto iota(size_t start, size_t end) {
-  return spl::generator([start, end](auto&& output) mutable {
-    if (start < end) {
-      output(size_t(start));
-      ++start;
-      return true;        // more to come
+  return spl::generator([start, end](auto&& output, auto&&... args)
+                        mutable {
+    auto invoke = [&] {
+      return output(std::forward<decltype(args)>(args)..., start);
+    };
+    if constexpr (spl::impl::calculate_type_v<decltype(output)>) {
+      return invoke();              // type-deduction pass
+    } else {
+      if (start < end) {
+        invoke(); ++start;
+        return true;                // more to come
+      }
+      return false;                 // done
     }
-    return false;         // done
   });
 }
 ```

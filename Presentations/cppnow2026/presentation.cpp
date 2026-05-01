@@ -58,6 +58,17 @@ void TpoiasiRanges(std::ostream& os) {
 // ---------------------------------------------------------------------------
 // Section: SPL — CRASH EXAMPLE
 // Slide: CRASH EXAMPLE (SPL)
+// FNV-1a 32-bit hash. Used in place of std::hash<std::string> so the demo
+// output is identical across stdlib implementations (libc++ vs libstdc++).
+constexpr uint32_t fnv1a32(std::string_view s) {
+  uint32_t h = 0x811c9dc5u;
+  for (unsigned char c : s) {
+    h ^= c;
+    h *= 0x01000193u;
+  }
+  return h;
+}
+
 // ---------------------------------------------------------------------------
 void CrashExampleSpl(std::ostream& os) {
   using IntAndString = std::pair<int, std::string>;
@@ -68,8 +79,7 @@ void CrashExampleSpl(std::ostream& os) {
   spl::apply(spl::iota(1, 10000001),
              spl::transform(make_int_and_string),
              spl::filter([](const auto& p) {
-               return p.first >= static_cast<int>(
-                                     std::hash<std::string>()(p.second));
+               return static_cast<uint32_t>(p.first) >= fnv1a32(p.second);
              }),
              spl::transform(&IntAndString::second),
              spl::take(4),
@@ -189,6 +199,80 @@ void IotaDemo(std::ostream& os) {
   auto v = spl::apply(spl::iota(1, 11), spl::to_vector());
   for (auto x : v) os << x << ' ';
   os << '\n';
+}
+
+// Verifies the GENERATORS / IOTA WITH END slide: a hand-written iota
+// matching spl::iota's protocol — type-deduction short-circuit plus
+// args... passthrough so it composes with multi-arg streams.
+inline constexpr auto my_iota(size_t start, size_t end) {
+  return spl::generator(
+      [start, end](auto&& output, auto&&... args) mutable {
+        auto invoke = [&] {
+          return output(std::forward<decltype(args)>(args)..., start);
+        };
+        if constexpr (spl::impl::calculate_type_v<decltype(output)>) {
+          return invoke();
+        } else {
+          if (start < end) {
+            invoke();
+            ++start;
+            return true;
+          }
+          return false;
+        }
+      });
+}
+
+void CustomIotaDemo(std::ostream& os) {
+  // Use as a plain source.
+  os << "  plain: ";
+  auto v = spl::apply(my_iota(1, 6), spl::to_vector());
+  for (auto x : v) os << x << ' ';
+  os << '\n';
+
+  // Use inside zip_result + flatten to verify the args... passthrough.
+  os << "  zipped:\n";
+  spl::apply(my_iota(1, 4),
+             spl::zip_result([](size_t a) { return my_iota(1, a + 1); }),
+             spl::flatten(),
+             spl::for_each([&](size_t a, size_t b) {
+               os << "    " << a << "," << b << "\n";
+             }));
+}
+
+// User-defined source with only SkydownSplMakeGenerator (no range
+// interface, no SkydownSplOutput). Verifies the fallback overload of
+// SkydownSplOutput in spl.h that auto-routes through MakeGenerator.
+namespace fallback_demo {
+struct CountTo {
+  size_t n;
+};
+
+constexpr auto SkydownSplMakeGenerator(CountTo c) {
+  return spl::generator(
+      [i = size_t{0}, n = c.n](auto&& output, auto&&... args) mutable {
+        auto invoke = [&] {
+          return output(std::forward<decltype(args)>(args)..., i);
+        };
+        if constexpr (spl::impl::calculate_type_v<decltype(output)>) {
+          return invoke();
+        } else {
+          if (i < n) {
+            invoke();
+            ++i;
+            return true;
+          }
+          return false;
+        }
+      });
+}
+}  // namespace fallback_demo
+
+void MakeGeneratorFallbackDemo(std::ostream& os) {
+  // CountTo is not a range and has no SkydownSplOutput overload — only
+  // SkydownSplMakeGenerator. The fallback in spl.h routes it through.
+  spl::apply(fallback_demo::CountTo{4},
+             spl::for_each([&](size_t i) { os << "  " << i << "\n"; }));
 }
 
 // ---------------------------------------------------------------------------
@@ -557,10 +641,10 @@ int main() {
 )");
 
   expect("Crash example (SPL — runs safely)", &CrashExampleSpl, R"(
-  2
-  4
-  5
-  7
+  630
+  632
+  633
+  634
 )");
 
   expect("TPOIASI (SPL — single evaluation)", &TpoiasiSpl, R"(
@@ -610,6 +694,26 @@ int main() {
 
   expect("iota demo", &IotaDemo, R"(
 1 2 3 4 5 6 7 8 9 10
+)");
+
+  expect("custom iota (matches GENERATORS / IOTA WITH END slide)",
+         &CustomIotaDemo, R"(
+  plain: 1 2 3 4 5
+  zipped:
+    1,1
+    2,1
+    2,2
+    3,1
+    3,2
+    3,3
+)");
+
+  expect("SkydownSplMakeGenerator-only fallback",
+         &MakeGeneratorFallbackDemo, R"(
+  0
+  1
+  2
+  3
 )");
 
   expect("multi-argument streams: expand_tuple + flatten", &MultiArgStreams, R"(
